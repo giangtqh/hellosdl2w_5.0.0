@@ -5,6 +5,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.telephony.SmsManager;
 import android.util.Log;
@@ -21,6 +23,9 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     public static final String PORT = "com.example.PORT";
@@ -28,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     private static final int MY_PERMISSIONS_REQUEST_RECEIVE_SMS = 2;
+    private static final int MY_PERMISSIONS_REQUEST_READ_SMS = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,7 +62,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Check to see if SMS is enabled.
-        checkForSmsPermission();
+//        checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
+        checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
         enableSmsButton();
         final ImageButton btnSendSms = (ImageButton) findViewById(R.id.message_icon);
         btnSendSms.setOnClickListener(new View.OnClickListener() {
@@ -112,26 +119,72 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        final Button loadSMS = (Button) findViewById(R.id.btnLoadSms);
+        loadSMS.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
+                List<String> messages = new ArrayList<String>();
+                Uri uriSMSURI = Uri.parse("content://sms/");
+                Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
+
+                if (cursor.moveToFirst()) { // must check the result to prevent exception
+                    do {
+                        String body = cursor.getString(cursor.getColumnIndex("body"));
+                        int read = cursor.getInt(cursor.getColumnIndex("read"));
+                        String address = cursor.getString(cursor.getColumnIndex("address"));
+                        String date_sent = cursor.getString(cursor.getColumnIndex("date_sent"));
+//                            for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
+//                                body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
+//                            }
+                        Log.d(TAG, address + " " + body + " " + read + " " + date_sent);
+                    } while (cursor.moveToNext());
+                } else {
+                    Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
     }
 
     /**
      * Checks whether the app has SMS permission.
      */
-    private void checkForSmsPermission() {
-        if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECEIVE_SMS)
-                != PackageManager.PERMISSION_GRANTED) {
+    private void checkForSmsPermission(int permission) {
+        switch (permission) {
+            case MY_PERMISSIONS_REQUEST_RECEIVE_SMS:
+                if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECEIVE_SMS)
+                        != PackageManager.PERMISSION_GRANTED) {
 
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS},
-                    MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
-        }
-        if (ActivityCompat.checkSelfPermission(this,
-                Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, getString(R.string.permission_not_granted));
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.SEND_SMS},
-                    MY_PERMISSIONS_REQUEST_SEND_SMS);
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS},
+                            MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
+                }
+                break;
+            case MY_PERMISSIONS_REQUEST_SEND_SMS:
+                if (ActivityCompat.checkSelfPermission(this,
+                        Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, getString(R.string.permission_not_granted));
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.SEND_SMS},
+                            MY_PERMISSIONS_REQUEST_SEND_SMS);
 
+                }
+                break;
+            case MY_PERMISSIONS_REQUEST_READ_SMS:
+                if (ActivityCompat.checkSelfPermission(this,
+                        Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, getString(R.string.permission_not_granted));
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.READ_SMS},
+                            MY_PERMISSIONS_REQUEST_READ_SMS);
+
+                }
+                break;
+            default:
+                Log.d(TAG, "request invalid permission.");
+                break;
         }
+
+
     }
 
     /**
@@ -145,20 +198,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
-        Log.d(TAG, "request code " + requestCode);
-        for (String i : permissions) {
-            Log.d(TAG, "permissions: " + i);
-        }
-        Log.d(TAG, "permission size: " + permissions.length + "grant size: " + grantResults.length);
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_SEND_SMS: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // Permission was granted. Enable sms button.
+                    Log.d(TAG, "SEND_SMS permission granted.");
                     enableSmsButton();
+//                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
                 } else {
                     // Permission denied.
-                    Log.d(TAG, getString(R.string.failure_permission));
-                    Toast.makeText((Context) this, getString(R.string.failure_permission),
+                    Log.d(TAG, "Failed to obtain SEND_SMS permission.");
+                    Toast.makeText(getApplicationContext(), "Fail to obtain SEND_SMS permission.",
                             Toast.LENGTH_LONG).show();
                     // Disable the sms button.
                     disableSmsButton();
@@ -167,11 +217,25 @@ public class MainActivity extends AppCompatActivity {
             break;
             case MY_PERMISSIONS_REQUEST_RECEIVE_SMS:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
+                    Log.d(TAG, "RECEIVE_SMS permission granted.");
+//                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_SEND_SMS);
+                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
                 } else {
                     // Permission denied.
-                    Log.d(TAG, getString(R.string.failure_permission));
-                    Toast.makeText((Context) this, getString(R.string.failure_permission),
+                    Log.d(TAG, "Failed to obtain RECEIVE_SMS permission.");
+                    Toast.makeText(getApplicationContext(), "Failed to obtain RECEIVE_SMS permission.",
+                            Toast.LENGTH_LONG).show();
+                }
+                break;
+            case MY_PERMISSIONS_REQUEST_READ_SMS:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "READ_SMS permission granted.");
+                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_SEND_SMS);
+//                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
+                } else {
+                    // Permission denied.
+                    Log.d(TAG, "Failed to obtain READ_SMS permission.");
+                    Toast.makeText(getApplicationContext(), "Failed to obtain READ_SMS permission.",
                             Toast.LENGTH_LONG).show();
                 }
                 break;
@@ -208,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
         // when message sent and when delivered, or set to null.
         PendingIntent sentIntent = null, deliveryIntent = null;
         // Check for permission first.
-        checkForSmsPermission();
+        checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
         // Use SmsManager.
         SmsManager smsManager = SmsManager.getDefault();
         smsManager.sendTextMessage(destinationAddress, scAddress, smsMessage,

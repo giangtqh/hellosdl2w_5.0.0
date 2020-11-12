@@ -6,7 +6,7 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context="coam.example.hellosdl2w.MainActivity">
+    tools:context="com.example.hellosdl2w.MainActivity">
 
     <TextView
         android:id="@+id/txtHello"
@@ -89,11 +89,11 @@
         android:text="Click below buttons to simulate test">
     </TextView>
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/testBtnLayout"
         android:layout_below="@+id/textSimulate"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
 
         <Button
@@ -107,6 +107,7 @@
             android:id="@+id/btnDial"
             android:textAllCaps="false"
             android:text="Dial"
+            android:layout_toRightOf="@id/btnInCall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
@@ -114,15 +115,24 @@
             android:id="@+id/btnEndCall"
             android:textAllCaps="false"
             android:text="EndCall"
+            android:layout_toRightOf="@id/btnDial"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
         <Button
             android:id="@+id/btnPushDummySMS"
             android:textAllCaps="false"
             android:text="push SMS"
+            android:layout_toRightOf="@id/btnEndCall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
-    </LinearLayout>
+        <Button
+            android:id="@+id/btnLoadSms"
+            android:textAllCaps="false"
+            android:text="Load SMS"
+            android:layout_below="@id/btnInCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </RelativeLayout>
 
 
 </RelativeLayout>

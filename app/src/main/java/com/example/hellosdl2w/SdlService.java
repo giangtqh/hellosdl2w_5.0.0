@@ -32,7 +32,9 @@ import com.smartdevicelink.managers.screen.menu.VoiceCommand;
 import com.smartdevicelink.managers.screen.menu.VoiceCommandSelectionListener;
 import com.smartdevicelink.protocol.enums.FunctionID;
 import com.smartdevicelink.proxy.RPCNotification;
+import com.smartdevicelink.proxy.rpc.AddCommand;
 import com.smartdevicelink.proxy.rpc.Alert;
+import com.smartdevicelink.proxy.rpc.MenuParams;
 import com.smartdevicelink.proxy.rpc.OnButtonEvent;
 import com.smartdevicelink.proxy.rpc.OnButtonPress;
 import com.smartdevicelink.proxy.rpc.OnHMIStatus;
@@ -183,7 +185,7 @@ public class SdlService extends Service {
             public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
                 mActiveInfoType = InfoType.SMS;
                 Toast.makeText(getApplicationContext(), "SMS clicked", Toast.LENGTH_LONG).show();
-                createSMSChoiceSet();
+                createSMSList();
                 updateHmi();
             }
 
@@ -720,28 +722,75 @@ public class SdlService extends Service {
 
     }
 
-    private void createSMSChoiceSet() {
-        // Load current sms messages
+    public void getSMS() {
         List<String> messages = new ArrayList<String>();
+        Uri uriSMSURI = Uri.parse("content://sms/inbox");
+        Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
+
+//        String body = "";
+        if (cursor.moveToFirst()) { // must check the result to prevent exception
+            do {
+                String body = "";
+                for(int idx=0; idx < cursor.getColumnCount(); idx++) {
+                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
+                    Log.d(TAG, "message: " + body);
+                }
+                // use msgData
+            } while (cursor.moveToNext());
+        } else {
+            // empty box, no SMS
+        }
+    }
+
+    private List<SMSMessage> getSMSMessages() {
+        List<SMSMessage> messages = new ArrayList<SMSMessage>();
         Uri uriSMSURI = Uri.parse("content://sms/");
-        Cursor cur = getContentResolver().query(uriSMSURI, null, null, null, null);
+        Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
 
-        String body = "emtpy";
-        while (cur != null && cur.moveToNext()) {
-            String address = cur.getString(cur.getColumnIndex("address"));
-            body = cur.getString(cur.getColumnIndexOrThrow("body"));
-            messages.add("Number: " + address + " .Message: " + body);
+        if ((cursor != null) && cursor.moveToFirst()) {
+            do {
+                String body = cursor.getString(cursor.getColumnIndex("body"));
+                int read = cursor.getInt(cursor.getColumnIndex("read"));
+                String address = cursor.getString(cursor.getColumnIndex("address"));
+                String date_sent = cursor.getString(cursor.getColumnIndex("date_sent"));
+//                for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
+//                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
+//                }
+                messages.add(new SMSMessage(address, read, body, date_sent));
+            } while (cursor.moveToNext());
+        } else {
+            Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
         }
 
-        if (cur != null) {
-            cur.close();
+        if (cursor != null) {
+            cursor.close();
         }
+        return messages;
+    }
 
-        mChoiceSMSList = new ArrayList<>();
-        for (String item : messages) {
-            mChoiceSMSList.add(new ChoiceCell(item));
+    private void createSMSList() {
+        // Load current sms messages
+        List<SMSMessage> messages = getSMSMessages();
+        for (SMSMessage item : messages) {
+            AddCommand command = new AddCommand();
+            MenuParams params = new MenuParams();
+            // parentId is used to identify list type, 1: Call history, 2: Contact List, 3: SMS messages
+            params.setParentID(3);
+            String json = "{\"address\":" + item.address + "," +
+                            "\"read\":" + item.read + "," +
+                            "\"body\":" + item.body + "," +
+                            "\"date_sent\":" + item.date_sent + "}";
+            Log.d(TAG, "json: " + json);
+            params.setMenuName(json);
+            command.setMenuParams(params);
+            // TODO(GTR): How to generate CmdId or handle it when onCommand()
+            command.setCmdID(1234);
+            sdlManager.sendRPC(command);
         }
-        sdlManager.getScreenManager().preloadChoices(mChoiceSMSList, null);
+        // Send an alert to notify list items finished
+        Alert alert = new Alert();
+        alert.setAlertText1("SMS_LIST_DONE");
+        sdlManager.sendRPC(alert);
     }
 
     private void performShowSMS() {

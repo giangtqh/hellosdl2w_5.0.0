@@ -3,6 +3,8 @@ package com.example.hellosdl2w;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.telephony.SmsMessage;
@@ -10,6 +12,9 @@ import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class SMSReceiver extends BroadcastReceiver {
     private static final String TAG = "SMSReceiver";
