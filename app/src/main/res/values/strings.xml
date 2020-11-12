@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Hello Sdl2W</string>
+    <string name="hello_world">Hello SDL!</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="show">Show</string>
+    <string name="enter_phone">Enter a phone number</string>
+    <string name="phone_status">"Phone Status: "</string>
+    <string name="ringing">"RINGING, number: "</string>
+    <string name="offhook">OFFHOOK</string>
+    <string name="idle">IDLE</string>
+    <string name="restarting_app">Restarting app</string>
+    <string name="permission_not_granted">PERMISSION NOT GRANTED!</string>
+    <string name="dial_number">"Phone Status: DIALING: "</string>
+    <string name="failure_permission">Failure to obtain permission!</string>
+    <string name="telephony_enabled">Telephony is enabled</string>
+    <string name="telephony_not_enabled">"TELEPHONY NOT ENABLED! "</string>
+    <string name="call">Call</string>
+    <string name="make_a_call">Make a call</string>
+    <string name="send_a_message">Send a message</string>
+    <string name="enter_message_here">Enter message here</string>
+    <string name="phone_disabled">Phone calling disabled.</string>
+    <string name="retry">Retry</string>
+    <string name="sms_disabled">SMS usage disabled</string>
+    <string name="granted_permission">Permission Granted</string>
+    <string name="app_main_field1">Amazing App</string>
+    <string name="app_main_field2">SDL2W</string>
+    <string name="app_main_field3">Phone, Contact, Message</string>
+    <string name="app_main_field4">"Oh shit"</string>
+    <string name="phone">Phone</string>
+    <string name="contact">Contact</string>
+    <string name="sms">SMS</string>
+
+    <!-- Welcome message -->
+    <string name="welcome_textfield1">"Welcome to"</string>
+    <string name="welcome_textfield2">"Hello SDL2W"</string>
+    <string name="welcome_textfield3">""</string>
+    <string name="welcome_textfield4">""</string>
+    <string name="welcome_speak">"Welcome to Hello SDL2W"</string>
+
+</resources>

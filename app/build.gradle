@@ -1,0 +1,56 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.2"
+
+    defaultConfig {
+        applicationId "com.example.hellosdl2w"
+        minSdkVersion 16
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    flavorDimensions "default"
+    productFlavors {
+        multi_sec_high {
+            buildConfigField 'String', 'TRANSPORT', '"MULTI"'
+            buildConfigField 'String', 'SECURITY', '"HIGH"'
+        }
+        multi_sec_med {
+            buildConfigField 'String', 'TRANSPORT', '"MULTI"'
+            buildConfigField 'String', 'SECURITY', '"MED"'
+        }
+        multi_sec_low {
+            buildConfigField 'String', 'TRANSPORT', '"MULTI"'
+            buildConfigField 'String', 'SECURITY', '"LOW"'
+        }
+        multi_sec_off {
+            buildConfigField 'String', 'TRANSPORT', '"MULTI"'
+            buildConfigField 'String', 'SECURITY', '"OFF"'
+        }
+        multi_high_bandwidth {
+            buildConfigField 'String', 'TRANSPORT', '"MULTI_HB"'
+            buildConfigField 'String', 'SECURITY', '"OFF"'
+        }
+        tcp {
+            buildConfigField 'String', 'TRANSPORT', '"TCP"'
+            buildConfigField 'String', 'SECURITY', '"OFF"'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.smartdevicelink:sdl_android:5.0.0'
+
+}
