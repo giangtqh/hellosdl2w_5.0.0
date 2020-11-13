@@ -339,6 +339,7 @@ public class SdlService extends Service {
                                 //preloadChoices();
                                 //subscribeToButtons();
                                 showFeatures();
+                                //sendContactlist();
                                 //startAudioStream();
                             }
                         }

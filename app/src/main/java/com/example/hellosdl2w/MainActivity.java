@@ -2,12 +2,14 @@ package com.example.hellosdl2w;
 
 import android.Manifest;
 import android.app.PendingIntent;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.Menu;
@@ -18,9 +20,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -34,6 +38,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     private static final int MY_PERMISSIONS_REQUEST_RECEIVE_SMS = 2;
     private static final int MY_PERMISSIONS_REQUEST_READ_SMS = 3;
+    private static final int MY_PERMISSIONS_REQUEST_READ_CONTACT = 4;
+    public ArrayList listcontact;
+    public ListView list;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +153,57 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        //
+        checkForContactPermission();
+        final Button contactList = (Button) findViewById(R.id.btnContact);
+        contactList.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Log.d(TAG, "clicked on button contact list");
+                list = findViewById(R.id.list);
+                listcontact = getAllContacts();
+                ArrayAdapter adapter = new ArrayAdapter<String>(MainActivity.this,
+                        android.R.layout.simple_list_item_1, android.R.id.text1, listcontact);
+                list.setAdapter(adapter);
+                }
+        });
+    }
+
+    private ArrayList getAllContacts() {
+        ArrayList<String> nameList = new ArrayList<>();
+        ContentResolver cr = getContentResolver();
+        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
+
+        if ((cur != null ? cur.getCount() : 0) > 0) {
+            while (cur.moveToNext()) {
+                String id = cur.getString(
+                        cur.getColumnIndex(ContactsContract.Contacts._ID));
+                String name = cur.getString(cur.getColumnIndex(
+                        ContactsContract.Contacts.DISPLAY_NAME));
+                nameList.add(name);
+                System.out.println("add name finished" + name + " + " + id);
+                if (cur.getInt(cur.getColumnIndex( ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
+
+                    Cursor pCur = cr.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null);
+                    while (pCur.moveToNext()) {
+                        String phoneNo = pCur.getString(pCur.getColumnIndex(
+                                ContactsContract.CommonDataKinds.Phone.NUMBER));
+                        System.out.println("in has phone number" + phoneNo);
+                        nameList.add(phoneNo);
+                    }
+                    pCur.close();
+                }
+            }
+        }
+
+        if (cur != null) {
+            cur.close();
+        }
+
+        return nameList;
     }
 
     /**
@@ -187,6 +245,20 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
+    }
+
+    /**
+     * Checks whether the app has Contact permission.
+     */
+    private void checkForContactPermission() {
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, getString(R.string.permission_not_granted));
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_CONTACTS},
+                    MY_PERMISSIONS_REQUEST_READ_CONTACT);
+        }
     }
 
     /**
