@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -32,11 +33,13 @@ import com.smartdevicelink.managers.screen.menu.VoiceCommand;
 import com.smartdevicelink.managers.screen.menu.VoiceCommandSelectionListener;
 import com.smartdevicelink.protocol.enums.FunctionID;
 import com.smartdevicelink.proxy.RPCNotification;
+import com.smartdevicelink.proxy.RPCResponse;
 import com.smartdevicelink.proxy.rpc.AddCommand;
 import com.smartdevicelink.proxy.rpc.Alert;
 import com.smartdevicelink.proxy.rpc.MenuParams;
 import com.smartdevicelink.proxy.rpc.OnButtonEvent;
 import com.smartdevicelink.proxy.rpc.OnButtonPress;
+import com.smartdevicelink.proxy.rpc.OnCommand;
 import com.smartdevicelink.proxy.rpc.OnHMIStatus;
 import com.smartdevicelink.proxy.rpc.Speak;
 import com.smartdevicelink.proxy.rpc.TTSChunk;
@@ -51,7 +54,9 @@ import com.smartdevicelink.proxy.rpc.enums.PredefinedWindows;
 import com.smartdevicelink.proxy.rpc.enums.SpeechCapabilities;
 import com.smartdevicelink.proxy.rpc.enums.TextAlignment;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
+import com.smartdevicelink.proxy.rpc.listeners.OnMultipleRequestListener;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCNotificationListener;
+import com.smartdevicelink.proxy.rpc.listeners.OnRPCResponseListener;
 import com.smartdevicelink.transport.BaseTransportConfig;
 import com.smartdevicelink.transport.MultiplexTransportConfig;
 import com.smartdevicelink.transport.TCPTransportConfig;
@@ -62,6 +67,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 public class SdlService extends Service {
@@ -103,6 +109,12 @@ public class SdlService extends Service {
     private static final int CHOICE_PHONE_ID = 200;
     private static final int CHOICE_CONTACT_ID = 201;
     private static final int CHOICE_SMS_ID = 202;
+
+    // Contact commands ID range from 500->999, Phone: 1000->1999, SMS: 2000->2999
+    private static int mContactCommandId = 500;
+    private static int mPhoneCommandId = 1000;
+    private static int mSMSCommandId = 2000;
+    Map<Integer, SMSMessage> mMapSMSMessage;
     // old
 //	private SoftButton mPhoneSoftBtn = null;
 //	private SoftButton mContactSoftBtn = null;
@@ -316,7 +328,8 @@ public class SdlService extends Service {
                             }
                             if (onHMIStatus.getHmiLevel() == HMILevel.HMI_FULL && onHMIStatus.getFirstRun()) {
                                 //setVoiceCommands();
-                                //sendMenus();
+//                                sendMenus();
+                                //sendCommands();
                                 //performWelcomeSpeak();
                                 //performWelcomeShow();
                                 //preloadChoices();
@@ -326,6 +339,33 @@ public class SdlService extends Service {
                             }
                         }
                     });
+
+                    sdlManager.addOnRPCNotificationListener(FunctionID.ON_COMMAND, new OnRPCNotificationListener() {
+                        @Override
+                        public void onNotified(RPCNotification notification) {
+                            OnCommand onCommand = (OnCommand) notification;
+                            int cmdId = onCommand.getCmdID();
+                            Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
+                            if (cmdId < 1000) {
+                                // Contact list commands
+                            } else if (cmdId < 2000) {
+                                // Call log commands
+                            } else if (cmdId < 3000) {
+                                // sms message commands
+                            } else {
+                                Toast.makeText(getApplicationContext(), "Invalid command Id: " + cmdId, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+
+                    sdlManager.addOnRPCNotificationListener(FunctionID.ON_TOUCH_EVENT, new OnRPCNotificationListener() {
+                        @Override
+                        public void onNotified(RPCNotification notification) {
+                            Toast.makeText(getApplicationContext(), "On touch event", Toast.LENGTH_LONG).show();
+                        }
+                    });
+
+
                 }
 
                 @Override
@@ -635,7 +675,7 @@ public class SdlService extends Service {
                 performShowContacts();
                 break;
             case SMS:
-                performShowSMS();
+                //performShowSMS();
                 break;
             default:
                 break;
@@ -722,26 +762,6 @@ public class SdlService extends Service {
 
     }
 
-    public void getSMS() {
-        List<String> messages = new ArrayList<String>();
-        Uri uriSMSURI = Uri.parse("content://sms/inbox");
-        Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
-
-//        String body = "";
-        if (cursor.moveToFirst()) { // must check the result to prevent exception
-            do {
-                String body = "";
-                for(int idx=0; idx < cursor.getColumnCount(); idx++) {
-                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
-                    Log.d(TAG, "message: " + body);
-                }
-                // use msgData
-            } while (cursor.moveToNext());
-        } else {
-            // empty box, no SMS
-        }
-    }
-
     private List<SMSMessage> getSMSMessages() {
         List<SMSMessage> messages = new ArrayList<SMSMessage>();
         Uri uriSMSURI = Uri.parse("content://sms/");
@@ -768,25 +788,82 @@ public class SdlService extends Service {
         return messages;
     }
 
+    private void sendCommands() {
+        AddCommand command = new AddCommand();
+        MenuParams params = new MenuParams();
+        params.setMenuName("Giang Test menu AddCommand");
+        command.setCmdID(9999);
+        command.setMenuParams(params);
+        sdlManager.sendRPC(command);
+    }
+
+    private void addSMSCommands(AddCommand cmd, int cmdId, MenuParams params) {
+        cmd.setCmdID(cmdId);
+        cmd.setMenuParams(params);
+        cmd.setOnRPCResponseListener(new OnRPCResponseListener() {
+            @Override
+            public void onResponse(int correlationId, RPCResponse response) {
+                addSMSCommands();
+            }
+        });
+        sdlManager.sendRPC(cmd);
+    }
+
     private void createSMSList() {
         // Load current sms messages
         List<SMSMessage> messages = getSMSMessages();
-        for (SMSMessage item : messages) {
+        messages.
+        Toast.makeText(getApplicationContext(), "createSmsList size: " + messages.size(), Toast.LENGTH_LONG).show();
+        List<AddCommand> listCmds = new ArrayList<>();
+//        SMSMessage item = messages.get(0);
+        for (SMSMessage item : messages)
+        {
+//            sendCommands();
             AddCommand command = new AddCommand();
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    Toast.makeText(getApplicationContext(), "AddCommand onResponse: " + response.getSuccess(), Toast.LENGTH_LONG).show();
+                    sendCommands();
+                }
+            });
             MenuParams params = new MenuParams();
             // parentId is used to identify list type, 1: Call history, 2: Contact List, 3: SMS messages
-            params.setParentID(3);
+            //params.setParentID(3);
             String json = "{\"address\":" + item.address + "," +
-                            "\"read\":" + item.read + "," +
-                            "\"body\":" + item.body + "," +
-                            "\"date_sent\":" + item.date_sent + "}";
+                    "\"read\":" + item.read + "," +
+                    "\"body\":" + item.body + "," +
+                    "\"date_sent\":" + item.date_sent + "}";
             Log.d(TAG, "json: " + json);
-            params.setMenuName(json);
+            //params.setMenuName(json);
+            params.setMenuName(item.body);
+            int commandId = generateSMSCmdId();
+            command.setCmdID(commandId);
             command.setMenuParams(params);
-            // TODO(GTR): How to generate CmdId or handle it when onCommand()
-            command.setCmdID(1234);
             sdlManager.sendRPC(command);
+            // TODO(GTR): How to generate CmdId or handle it when onCommand()
+            mMapSMSMessage.put(commandId, item);
+
+            listCmds.add(command);
         }
+//        sdlManager.getScreenManager().beginTransaction();
+//        sdlManager.getScreenManager().
+//        sdlManager.sendRPCs(listCmds, new OnMultipleRequestListener() {
+//            @Override
+//            public void onUpdate(int remainingRequests) {
+//
+//            }
+//
+//            @Override
+//            public void onFinished() {
+//
+//            }
+//
+//            @Override
+//            public void onResponse(int correlationId, RPCResponse response) {
+//                Toast.makeText(getApplicationContext(), "AddCommand response: " + response.getSuccess(), Toast.LENGTH_LONG).show();
+//            }
+//        });
         // Send an alert to notify list items finished
         Alert alert = new Alert();
         alert.setAlertText1("SMS_LIST_DONE");
@@ -814,5 +891,29 @@ public class SdlService extends Service {
      */
     private void performShowCallLog() {
         // TODO(Toan):
+    }
+
+    private int generateContactCmdId() {
+        mContactCommandId++;
+        if (mContactCommandId >= 1000) {
+            mContactCommandId = 500;
+        }
+        return mContactCommandId;
+    }
+
+    private int generatePhoneCmdId() {
+        mPhoneCommandId++;
+        if (mPhoneCommandId >= 2000) {
+            mPhoneCommandId = 1000;
+        }
+        return mPhoneCommandId;
+    }
+
+    private int generateSMSCmdId() {
+        mSMSCommandId++;
+        if (mSMSCommandId >= 3000) {
+            mSMSCommandId = 2000;
+        }
+        return mSMSCommandId;
     }
 }
