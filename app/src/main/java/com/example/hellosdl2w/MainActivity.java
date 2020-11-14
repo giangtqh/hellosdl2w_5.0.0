@@ -134,10 +134,12 @@ public class MainActivity extends AppCompatActivity {
                         int read = cursor.getInt(cursor.getColumnIndex("read"));
                         String address = cursor.getString(cursor.getColumnIndex("address"));
                         String date_sent = cursor.getString(cursor.getColumnIndex("date_sent"));
-//                            for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
-//                                body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
-//                            }
-                        Log.d(TAG, address + " " + body + " " + read + " " + date_sent);
+//                        Log.d(TAG, address + " " + body + " " + read + " " + date_sent);
+                        String full_content = "";
+                        for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
+                            full_content += " | " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
+                        }
+                        Log.d(TAG, full_content);
                     } while (cursor.moveToNext());
                 } else {
                     Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();

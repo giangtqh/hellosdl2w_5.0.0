@@ -8,14 +8,15 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.icu.text.UnicodeSetSpanner;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
 import com.smartdevicelink.managers.CompletionListener;
 import com.smartdevicelink.managers.screen.OnButtonListener;
 import com.smartdevicelink.managers.SdlManager;
@@ -36,6 +37,7 @@ import com.smartdevicelink.proxy.RPCNotification;
 import com.smartdevicelink.proxy.RPCResponse;
 import com.smartdevicelink.proxy.rpc.AddCommand;
 import com.smartdevicelink.proxy.rpc.Alert;
+import com.smartdevicelink.proxy.rpc.DeleteCommand;
 import com.smartdevicelink.proxy.rpc.MenuParams;
 import com.smartdevicelink.proxy.rpc.OnButtonEvent;
 import com.smartdevicelink.proxy.rpc.OnButtonPress;
@@ -54,7 +56,6 @@ import com.smartdevicelink.proxy.rpc.enums.PredefinedWindows;
 import com.smartdevicelink.proxy.rpc.enums.SpeechCapabilities;
 import com.smartdevicelink.proxy.rpc.enums.TextAlignment;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
-import com.smartdevicelink.proxy.rpc.listeners.OnMultipleRequestListener;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCNotificationListener;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCResponseListener;
 import com.smartdevicelink.transport.BaseTransportConfig;
@@ -66,6 +67,8 @@ import com.smartdevicelink.util.DebugTool;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -114,7 +117,6 @@ public class SdlService extends Service {
     private static int mContactCommandId = 500;
     private static int mPhoneCommandId = 1000;
     private static int mSMSCommandId = 2000;
-    Map<Integer, SMSMessage> mMapSMSMessage;
     // old
 //	private SoftButton mPhoneSoftBtn = null;
 //	private SoftButton mContactSoftBtn = null;
@@ -129,6 +131,14 @@ public class SdlService extends Service {
     private int mMenuChoiceSetId;
     private InfoType mActiveInfoType = InfoType.NONE; // Stores the current type of information being displayed
     private static SdlService instance = null;
+
+    List<SMSMessage> mSMSMessages = null;
+    Iterator<SMSMessage> mSMSIterator = null;
+    Map<Integer, SMSMessage> mMapSMSCmdId = new HashMap<>();
+    Iterator<Integer> mMapCmdIterator = null;
+    // variable used to increment correlation ID for every request sent to SDL
+    private int mCmdPosIncIndex = 0;
+    private Gson mGson = new Gson();
 
     static {
         instance = null;
@@ -676,6 +686,7 @@ public class SdlService extends Service {
                 break;
             case SMS:
                 //performShowSMS();
+                showSMSList();
                 break;
             default:
                 break;
@@ -762,21 +773,23 @@ public class SdlService extends Service {
 
     }
 
-    private List<SMSMessage> getSMSMessages() {
-        List<SMSMessage> messages = new ArrayList<SMSMessage>();
+    private void createSMSList() {
+        mSMSMessages = new ArrayList<SMSMessage>();
+        // get all sms messages includes inbox and sent
         Uri uriSMSURI = Uri.parse("content://sms/");
         Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
 
         if ((cursor != null) && cursor.moveToFirst()) {
             do {
                 String body = cursor.getString(cursor.getColumnIndex("body"));
-                int read = cursor.getInt(cursor.getColumnIndex("read"));
                 String address = cursor.getString(cursor.getColumnIndex("address"));
-                String date_sent = cursor.getString(cursor.getColumnIndex("date_sent"));
+                String date = cursor.getString(cursor.getColumnIndex("date"));
+                int read = cursor.getInt(cursor.getColumnIndex("read"));
+                int type = cursor.getInt(cursor.getColumnIndex("type"));
 //                for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
 //                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
 //                }
-                messages.add(new SMSMessage(address, read, body, date_sent));
+                mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
             Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
@@ -785,7 +798,6 @@ public class SdlService extends Service {
         if (cursor != null) {
             cursor.close();
         }
-        return messages;
     }
 
     private void sendCommands() {
@@ -797,77 +809,62 @@ public class SdlService extends Service {
         sdlManager.sendRPC(command);
     }
 
-    private void addSMSCommands(AddCommand cmd, int cmdId, MenuParams params) {
-        cmd.setCmdID(cmdId);
-        cmd.setMenuParams(params);
-        cmd.setOnRPCResponseListener(new OnRPCResponseListener() {
-            @Override
-            public void onResponse(int correlationId, RPCResponse response) {
-                addSMSCommands();
-            }
-        });
-        sdlManager.sendRPC(cmd);
-    }
-
-    private void createSMSList() {
-        // Load current sms messages
-        List<SMSMessage> messages = getSMSMessages();
-        messages.
-        Toast.makeText(getApplicationContext(), "createSmsList size: " + messages.size(), Toast.LENGTH_LONG).show();
-        List<AddCommand> listCmds = new ArrayList<>();
-//        SMSMessage item = messages.get(0);
-        for (SMSMessage item : messages)
-        {
-//            sendCommands();
-            AddCommand command = new AddCommand();
+    private void deleteCommands() {
+        if (mMapCmdIterator.hasNext()) {
+            final int cmdId = mMapCmdIterator.next();
+            DeleteCommand command = new DeleteCommand(cmdId);
             command.setOnRPCResponseListener(new OnRPCResponseListener() {
                 @Override
                 public void onResponse(int correlationId, RPCResponse response) {
-                    Toast.makeText(getApplicationContext(), "AddCommand onResponse: " + response.getSuccess(), Toast.LENGTH_LONG).show();
-                    sendCommands();
+                    mMapCmdIterator.remove();
+                    deleteCommands();
                 }
             });
+            sdlManager.sendRPC(command);
+        } else {
+            mSMSIterator = mSMSMessages.iterator();
+            addSMSCommands();
+        }
+    }
+
+    private void addSMSCommands() {
+        if (mSMSIterator.hasNext()) {
+            final SMSMessage item = mSMSIterator.next();
+            final int cmdId = generateSMSCmdId();
+            AddCommand command = new AddCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapSMSCmdId.put(cmdId, item); // put succeed command id only
+                    addSMSCommands();
+                }
+            });
+            String json = mGson.toJson(item);
             MenuParams params = new MenuParams();
-            // parentId is used to identify list type, 1: Call history, 2: Contact List, 3: SMS messages
-            //params.setParentID(3);
-            String json = "{\"address\":" + item.address + "," +
-                    "\"read\":" + item.read + "," +
-                    "\"body\":" + item.body + "," +
-                    "\"date_sent\":" + item.date_sent + "}";
-            Log.d(TAG, "json: " + json);
-            //params.setMenuName(json);
-            params.setMenuName(item.body);
-            int commandId = generateSMSCmdId();
-            command.setCmdID(commandId);
+            params.setMenuName(json);
+//            params.setPosition(mCmdPosIncIndex++);
+//            params.setPosition(0);
             command.setMenuParams(params);
             sdlManager.sendRPC(command);
-            // TODO(GTR): How to generate CmdId or handle it when onCommand()
-            mMapSMSMessage.put(commandId, item);
-
-            listCmds.add(command);
+        } else {
+            mCmdPosIncIndex = 0;
+            // reset iterator
+            mSMSIterator = mSMSMessages.iterator();
+            // Send an alert to notify list items finished
+            Alert alert = new Alert();
+            alert.setAlertText1("SMS_FILLED");
+            sdlManager.sendRPC(alert);
         }
-//        sdlManager.getScreenManager().beginTransaction();
-//        sdlManager.getScreenManager().
-//        sdlManager.sendRPCs(listCmds, new OnMultipleRequestListener() {
-//            @Override
-//            public void onUpdate(int remainingRequests) {
-//
-//            }
-//
-//            @Override
-//            public void onFinished() {
-//
-//            }
-//
-//            @Override
-//            public void onResponse(int correlationId, RPCResponse response) {
-//                Toast.makeText(getApplicationContext(), "AddCommand response: " + response.getSuccess(), Toast.LENGTH_LONG).show();
-//            }
-//        });
-        // Send an alert to notify list items finished
-        Alert alert = new Alert();
-        alert.setAlertText1("SMS_LIST_DONE");
-        sdlManager.sendRPC(alert);
+    }
+
+    public void showSMSList() {
+        if (mMapSMSCmdId.size() > 0) {
+            mMapCmdIterator = mMapSMSCmdId.keySet().iterator();
+            deleteCommands();
+        } else if (mSMSMessages.size() > 0) {
+            mSMSIterator = mSMSMessages.iterator();
+            addSMSCommands();
+        }
     }
 
     private void performShowSMS() {
