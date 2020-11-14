@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "push SMS button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onSMSNotification(new CustomAlert("ON_SMS", "0967129109","push dummy sms message"));
+                    instance.onSMSNotification(new SMSMessage("0967129109", "dummy sms message from mr.X", "", 0, 1));
                 }
             }
         });

@@ -61,7 +61,6 @@ import com.smartdevicelink.proxy.rpc.listeners.OnRPCResponseListener;
 import com.smartdevicelink.transport.BaseTransportConfig;
 import com.smartdevicelink.transport.MultiplexTransportConfig;
 import com.smartdevicelink.transport.TCPTransportConfig;
-import com.smartdevicelink.util.CorrelationIdGenerator;
 import com.smartdevicelink.util.DebugTool;
 
 import java.util.ArrayList;
@@ -108,10 +107,6 @@ public class SdlService extends Service {
     private static final int PHONE_BTN_ID = 100;
     private static final int CONTACT_BTN_ID = 101;
     private static final int SMS_BTN_ID = 102;
-    // Choice set for Phone, Contact, SMS (this replace for SoftButton
-    private static final int CHOICE_PHONE_ID = 200;
-    private static final int CHOICE_CONTACT_ID = 201;
-    private static final int CHOICE_SMS_ID = 202;
 
     // Contact commands ID range from 500->999, Phone: 1000->1999, SMS: 2000->2999
     private static int mContactCommandId = 500;
@@ -126,9 +121,6 @@ public class SdlService extends Service {
     private SoftButtonObject mContactSoftBtn = null;
     private SoftButtonObject mSMSSoftBtn = null;
 
-    private int mWelcomeCorrId;
-    private int mSNSAlertId;
-    private int mMenuChoiceSetId;
     private InfoType mActiveInfoType = InfoType.NONE; // Stores the current type of information being displayed
     private static SdlService instance = null;
 
@@ -173,7 +165,7 @@ public class SdlService extends Service {
             public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
                 mActiveInfoType = InfoType.PHONE;
                 Toast.makeText(getApplicationContext(), "Phone clicked", Toast.LENGTH_LONG).show();
-                // TODO (Toan): Get call history, create choice set
+                // TODO (Toan): Get call history
                 updateHmi();
             }
 
@@ -217,6 +209,8 @@ public class SdlService extends Service {
             }
         });
         mSMSSoftBtn.setButtonId(SMS_BTN_ID);
+
+        // TODO(GTR): Add soft buttons for PhoneCall(Accept, Deny, Cancel, Hangup), Contact List (Call, Message)
 
 //		mPhoneSoftBtn = new SoftButton();
 //		mPhoneSoftBtn.setSoftButtonID(PHONE_BTN_ID);
@@ -357,9 +351,11 @@ public class SdlService extends Service {
                             int cmdId = onCommand.getCmdID();
                             Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
                             if (cmdId < 1000) {
+                                // TODO(GTR): find contact with cmdId, send Alert with 2 soft button for Call & Message
                                 // Contact list commands
                             } else if (cmdId < 2000) {
                                 // Call log commands
+                                // TODO(GTR): find call history with the cmdId, dial call, send Alert with "Cancel" button
                             } else if (cmdId < 3000) {
                                 // sms message commands
                             } else {
@@ -685,7 +681,6 @@ public class SdlService extends Service {
                 performShowContacts();
                 break;
             case SMS:
-                //performShowSMS();
                 showSMSList();
                 break;
             default:
@@ -693,39 +688,30 @@ public class SdlService extends Service {
         }
     }
 
-    // TODO(GTR): use Alert request for SMS notification, check why this not work?
     // Alert has 3 mainField, use mainField1 for messageType, mainField2 for message body
     // Alert message type:
     // ON_CALL, ON_END_CALL, ON_DIAL, ON_SMS
-    public void onSMSNotification(CustomAlert alert) {
+    public void onSMSNotification(SMSMessage message) {
         Alert alertRequest = new Alert();
         alertRequest.setAlertText1("ON_SMS");
-        alertRequest.setAlertText2(alert.number);
-        alertRequest.setAlertText3(alert.message);
-        alertRequest.setDuration(7000);
-
-//		mSMSAlertId = CorrelationIdGenerator.generateId();
-        //alertRequest.setCorrelationID(CorrelationIdGenerator.generateId());
+        alertRequest.setAlertText2(message.address);
+        alertRequest.setAlertText3(message.body);
         sdlManager.sendRPC(alertRequest);
-        Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
+        //Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
     }
 
     public void onInCommingCall(String number) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
-        alert.setDuration(5000);
-        alert.setCorrelationID(CorrelationIdGenerator.generateId());
         sdlManager.sendRPC(alert);
-        Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
+        //Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
     }
 
     public void onDial(String number) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_DIAL");
         alert.setAlertText2(number);
-        alert.setDuration(5000);
-        alert.setCorrelationID(CorrelationIdGenerator.generateId());
         sdlManager.sendRPC(alert);
         Toast.makeText(this, "Dialing " + number, Toast.LENGTH_LONG).show();
     }
@@ -733,8 +719,6 @@ public class SdlService extends Service {
     public void onEndCall() {
         Alert alert = new Alert();
         alert.setAlertText1("ON_END_CALL");
-        alert.setDuration(5000);
-        alert.setCorrelationID(CorrelationIdGenerator.generateId());
         sdlManager.sendRPC(alert);
         Toast.makeText(this, "End call.", Toast.LENGTH_LONG).show();
     }
@@ -865,22 +849,6 @@ public class SdlService extends Service {
             mSMSIterator = mSMSMessages.iterator();
             addSMSCommands();
         }
-    }
-
-    private void performShowSMS() {
-        ChoiceSet choiceSet = new ChoiceSet("Choose an Item from the list", mChoiceSMSList, new ChoiceSetSelectionListener() {
-            @Override
-            public void onChoiceSelected(ChoiceCell choiceCell, TriggerSource triggerSource, int rowIndex) {
-                //showAlert(choiceCell.getText() + " was selected");
-                Toast.makeText(getApplicationContext(), choiceCell.getText() + " was selected", Toast.LENGTH_LONG).show();
-            }
-
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "There was an error showing the perform interaction: " + error);
-            }
-        });
-        sdlManager.getScreenManager().presentChoiceSet(choiceSet, InteractionMode.MANUAL_ONLY);
     }
 
     /**

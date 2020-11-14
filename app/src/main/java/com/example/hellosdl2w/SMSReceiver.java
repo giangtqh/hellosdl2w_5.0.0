@@ -46,6 +46,7 @@ public class SMSReceiver extends BroadcastReceiver {
                 // Build the message to show.
                 String number = msgs[i].getOriginatingAddress();
                 String body = msgs[i].getMessageBody();
+                //long timestamp = msgs[i].getTimestampMillis();
                 strMessage += "SMS from " + number;
                 strMessage += " :" + body + "\n";
                 // Log and display the SMS message.
@@ -54,8 +55,7 @@ public class SMSReceiver extends BroadcastReceiver {
 
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    // TODO(GTR) Why message send from here not work
-                    instance.onSMSNotification(new CustomAlert("ON_SMS", number, body));
+                    instance.onSMSNotification(new SMSMessage(number, body, "", 0, 1));
                 }
             }
         }
