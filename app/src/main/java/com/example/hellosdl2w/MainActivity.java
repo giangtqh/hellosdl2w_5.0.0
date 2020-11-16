@@ -11,7 +11,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.telephony.SmsManager;
+import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -31,6 +33,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    public ArrayList listcontact;
+    public ListView list;
+
     private static final String TAG = "MainActivity";
     public static final String PORT = "com.example.PORT";
     public static final String ADDRESS = "com.example.ADDRESS";
@@ -39,8 +44,14 @@ public class MainActivity extends AppCompatActivity {
     private static final int MY_PERMISSIONS_REQUEST_RECEIVE_SMS = 2;
     private static final int MY_PERMISSIONS_REQUEST_READ_SMS = 3;
     private static final int MY_PERMISSIONS_REQUEST_READ_CONTACT = 3;
-    public ArrayList listcontact;
-    public ListView list;
+    private static final int MY_PERMISSIONS_REQUEST_READ_CALL_LOG = 4;
+    private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_STATE = 5;
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE = 6;
+    private static final int MY_PERMISSIONS_REQUEST_PROCESS_OUTGOING_CALLS = 7;
+    private static final int MY_PERMISSIONS_REQUEST_ANSWER_PHONE_CALL = 8;
+    private static final int MY_PERMISSIONS_REQUEST_MANAGE_OWN_CALLS = 9 ;
+    private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_NUMBERS = 10 ;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +78,9 @@ public class MainActivity extends AppCompatActivity {
             });
 //            startService(proxyIntent);
         }
+        // check for all phone and call permission
+        checkForContactPermission();
+        checkForPhonePermission();
 
         // Check to see if SMS is enabled.
 //        checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
@@ -100,6 +114,9 @@ public class MainActivity extends AppCompatActivity {
                 if (instance != null) {
                     instance.onInCommingCall("0967129109");
                 }
+                Intent callIntent = new Intent(Intent.ACTION_CALL);
+                callIntent.setData(Uri.parse("tel:" + 12345678));//change the number
+                startActivity(callIntent);
             }
         });
 
@@ -155,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
         });
         //
         checkForContactPermission();
+
         final Button contactList = (Button) findViewById(R.id.btnContact);
         contactList.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -166,12 +184,34 @@ public class MainActivity extends AppCompatActivity {
                 list.setAdapter(adapter);
                 }
         });
+
+        final Button acceptCall = (Button) findViewById(R.id.btnAcceptCall);
+        acceptCall.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+
+            }
+        });
+
+        final Button rejectCall = (Button) findViewById(R.id.btnRejectCall);
+        rejectCall.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+
+            }
+        });
+
+        final Button hangup = (Button) findViewById(R.id.btnHangUp);
+        hangup.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+
+            }
+        });
+
     }
 
     private ArrayList getAllContacts() {
         ArrayList<String> nameList = new ArrayList<>();
         ContentResolver cr = getContentResolver();
-        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
+        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null,  null);
 
         if ((cur != null ? cur.getCount() : 0) > 0) {
             while (cur.moveToNext()) {
@@ -179,29 +219,24 @@ public class MainActivity extends AppCompatActivity {
                         cur.getColumnIndex(ContactsContract.Contacts._ID));
                 String name = cur.getString(cur.getColumnIndex(
                         ContactsContract.Contacts.DISPLAY_NAME));
-                nameList.add(name);
-                System.out.println("add name finished" + name + " + " + id);
+                String phoneNo = "";
                 if (cur.getInt(cur.getColumnIndex( ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
-
                     Cursor pCur = cr.query(
                             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                             null,
                             ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
                             new String[]{id}, null);
-                    while (pCur.moveToNext()) {
-                        String phoneNo = pCur.getString(pCur.getColumnIndex(
+                    if (pCur.moveToNext()) {
+                        phoneNo = pCur.getString(pCur.getColumnIndex(
                                 ContactsContract.CommonDataKinds.Phone.NUMBER));
-                        System.out.println("in has phone number" + phoneNo);
-                        nameList.add(phoneNo);
                     }
                     pCur.close();
                 }
+                nameList.add("Name: " + name + "\n" + "Phone Number: " + phoneNo);
             }
         }
-
-        if (cur != null) {
+        if (cur != null)
             cur.close();
-        }
 
         return nameList;
     }
@@ -262,6 +297,64 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * Checks whether the app has Phone call and Phone State permission.
+     */
+    private void checkForPhonePermission() {
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_CALL_LOG},
+                    MY_PERMISSIONS_REQUEST_READ_CALL_LOG);
+        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, getString(R.string.permission_not_granted));
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_PHONE_STATE},
+                    MY_PERMISSIONS_REQUEST_READ_PHONE_STATE);
+        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, getString(R.string.permission_not_granted));
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CALL_PHONE},
+                    MY_PERMISSIONS_REQUEST_CALL_PHONE);
+        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.PROCESS_OUTGOING_CALLS) != PackageManager.PERMISSION_GRANTED) {
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.PROCESS_OUTGOING_CALLS},
+                    MY_PERMISSIONS_REQUEST_PROCESS_OUTGOING_CALLS);
+        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ANSWER_PHONE_CALLS},
+                    MY_PERMISSIONS_REQUEST_ANSWER_PHONE_CALL);
+        }
+        //READ_PHONE_NUMBERS
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.MANAGE_OWN_CALLS) != PackageManager.PERMISSION_GRANTED) {
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.MANAGE_OWN_CALLS},
+                    MY_PERMISSIONS_REQUEST_MANAGE_OWN_CALLS);
+        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
+            // Permission has not been granted, therefore prompt the user to grant permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_PHONE_NUMBERS},
+                    MY_PERMISSIONS_REQUEST_READ_PHONE_NUMBERS);
+        }
+
+    }
+
+    /**
      * Processes permission request codes.
      *
      * @param requestCode  The request code passed in requestPermissions()
@@ -289,7 +382,19 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             break;
-            case MY_PERMISSIONS_REQUEST_RECEIVE_SMS:
+            case MY_PERMISSIONS_REQUEST_RECEIVE_SMS: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                } else {
+                    // Permission denied.
+                    Log.d(TAG, getString(R.string.failure_permission));
+                    Toast.makeText((Context) this, getString(R.string.failure_permission),
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+            break;
+
+            case MY_PERMISSIONS_REQUEST_CALL_PHONE:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "RECEIVE_SMS permission granted.");
 //                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_SEND_SMS);
@@ -312,7 +417,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(), "Failed to obtain READ_SMS permission.",
                             Toast.LENGTH_LONG).show();
                 }
-                break;
+            break;
         }
     }
 

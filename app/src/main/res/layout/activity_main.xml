@@ -142,6 +142,33 @@
             android:text="Load Contact"
             android:textAllCaps="false" />
 
+        <Button
+            android:id="@+id/btnAcceptCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/btnContact"
+            android:layout_below="@id/btnDial"
+            android:text="Accept Call"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/btnRejectCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/btnAcceptCall"
+            android:layout_below="@id/btnEndCall"
+            android:text="Reject Call"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/btnHangUp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/btnRejectCall"
+            android:layout_below="@id/btnEndCall"
+            android:text="Up"
+            android:textAllCaps="false" />
+
 
     </RelativeLayout>
 

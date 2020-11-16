@@ -1,22 +1,32 @@
 package com.example.hellosdl2w;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.icu.text.UnicodeSetSpanner;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.CallLog;
+import android.provider.ContactsContract;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.ActivityCompat;
+
 import com.smartdevicelink.managers.CompletionListener;
 import com.smartdevicelink.managers.screen.OnButtonListener;
 import com.smartdevicelink.managers.SdlManager;
@@ -101,6 +111,7 @@ public class SdlService extends Service {
     private SdlManager sdlManager = null;
     private List<ChoiceCell> choiceCellList;
     private List<ChoiceCell> mChoiceContactList;
+    private List<ChoiceCell> mChoiceCallLogList;
     private List<ChoiceCell> mChoiceSMSList;
 
     private HMILevel currentHMILevel = HMILevel.HMI_NONE;
@@ -526,13 +537,6 @@ public class SdlService extends Service {
         sdlManager.getScreenManager().setMenu(Arrays.asList(mainCell1, mainCell2, mainCell3, mainCell4, mainCell5));
     }
 
-    /**
-     * Will speak a sample welcome message
-     */
-    private void performWelcomeSpeak() {
-        List<TTSChunk> chunks = Collections.singletonList(new TTSChunk(WELCOME_SPEAK, SpeechCapabilities.TEXT));
-        sdlManager.sendRPC(new Speak(chunks));
-    }
 
     /**
      * Use the Screen Manager to set the initial screen text and set the image.
@@ -706,7 +710,7 @@ public class SdlService extends Service {
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
         sdlManager.sendRPC(alert);
-        //Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Incomming call: " + number, Toast.LENGTH_LONG).show();
     }
 
     public void onDial(String number) {
@@ -714,7 +718,7 @@ public class SdlService extends Service {
         alert.setAlertText1("ON_DIAL");
         alert.setAlertText2(number);
         sdlManager.sendRPC(alert);
-        Toast.makeText(this, "Dialing " + number, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Dialing: " + number, Toast.LENGTH_LONG).show();
     }
 
     public void onEndCall() {
@@ -726,6 +730,36 @@ public class SdlService extends Service {
 
     private void createContactChoiceSet() {
         // TODO(Toan): Use real contact list
+
+        ArrayList<String> nameList = new ArrayList<>();
+        ContentResolver cr = getContentResolver();
+        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
+
+        if ((cur != null ? cur.getCount() : 0) > 0) {
+            while (cur.moveToNext()) {
+                String id = cur.getString(
+                        cur.getColumnIndex(ContactsContract.Contacts._ID));
+                String name = cur.getString(cur.getColumnIndex(
+                        ContactsContract.Contacts.DISPLAY_NAME));
+                String phoneNo = "";
+                if (cur.getInt(cur.getColumnIndex( ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
+                    Cursor pCur = cr.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null);
+                    if (pCur.moveToNext()) {
+                        phoneNo = pCur.getString(pCur.getColumnIndex(
+                                ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    }
+                    pCur.close();
+                }
+                nameList.add("Name: " + name + " Phone Number: " + phoneNo);
+            }
+        }
+        if (cur != null)
+            cur.close();
+
         List<String> dummyContacts = new ArrayList<>(Arrays.asList(
                 "Bui Le Thuan",
                 "Nguyen Hoang An",
@@ -735,7 +769,7 @@ public class SdlService extends Service {
         ));
 
         mChoiceContactList = new ArrayList<>();
-        for (String item : dummyContacts) {
+        for (String item : nameList) {
             mChoiceContactList.add(new ChoiceCell(item));
         }
         sdlManager.getScreenManager().preloadChoices(mChoiceContactList, null);
@@ -855,8 +889,73 @@ public class SdlService extends Service {
     /**
      * Display the phone call history.
      */
-    private void performShowCallLog() {
-        // TODO(Toan):
+    public void performShowCallLog() {
+        ArrayList<String> callHistory = new ArrayList<>();
+        Uri uri = Uri.parse("content://call_log/calls");
+        Cursor cursor = getContentResolver().query(uri, null ,null,null);
+
+        assert cursor != null;
+        if(cursor.moveToFirst()){
+            do {
+                String number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
+                String name = getContactNameSDL(number);
+                String duration = cursor.getString(cursor.getColumnIndex(CallLog.Calls.DURATION));
+                if (name != null)
+                    callHistory.add("Name     :\t" + name);
+                else
+                    callHistory.add("Name     :\tnull");
+                callHistory.add("Number   :\t" + number);
+                callHistory.add("Duration :\t" + duration);
+            }
+            while (cursor.moveToNext());
+        }
+        else
+            callHistory.add("No data to show");
+        if(cursor != null)
+            cursor.close();
+
+        mChoiceCallLogList = new ArrayList<>();
+        for (String item : callHistory) {
+            mChoiceCallLogList.add(new ChoiceCell(item));
+        }
+        sdlManager.getScreenManager().preloadChoices(mChoiceCallLogList, null);
+
+        ChoiceSet choiceSet = new ChoiceSet("Choose an Item from the list", mChoiceCallLogList, new ChoiceSetSelectionListener() {
+            @Override
+            public void onChoiceSelected(ChoiceCell choiceCell, TriggerSource triggerSource, int rowIndex) {
+                showAlert(choiceCell.getText() + " was selected");
+                Toast.makeText(getApplicationContext(), choiceCell.getText() + " was selected", Toast.LENGTH_LONG).show();
+            }
+
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "There was an error showing the perform interaction: " + error);
+            }
+        });
+        sdlManager.getScreenManager().presentChoiceSet(choiceSet, InteractionMode.MANUAL_ONLY);
+    }
+
+    public void makeCall(String phoneNumber){
+        Intent callIntent = new Intent(Intent.ACTION_CALL);
+        callIntent.setData(Uri.parse("tel:" + phoneNumber));//change the number
+        startActivity(callIntent);
+    }
+    public String getContactNameSDL(String phoneNumber) {
+        Uri uri=Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI,Uri.encode(phoneNumber));
+
+        String[] projection = new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME};
+
+        String contactName="";
+        Cursor cursor = getContentResolver().query(uri,projection,null,null,null);
+
+        if (cursor != null) {
+            if(cursor.moveToFirst()) {
+                contactName = cursor.getString(0);
+            }
+            cursor.close();
+        }
+
+        return contactName;
     }
 
     private int generateContactCmdId() {
