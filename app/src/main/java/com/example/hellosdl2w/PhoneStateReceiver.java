@@ -16,9 +16,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 
 public class PhoneStateReceiver extends BroadcastReceiver {
-    final String LOG_TAG = "TelephonyAnswer";
-    public Context context;
-    private TelephonyManager tm = null;
+    public static Context context;
+    public TelephonyManager tm = null;
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -81,6 +80,7 @@ public class PhoneStateReceiver extends BroadcastReceiver {
 
         return contactName;
     }
+
     private void rejectCall(){
         try {
 
