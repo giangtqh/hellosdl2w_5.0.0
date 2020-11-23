@@ -6,10 +6,14 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
+import android.telecom.Call;
 import android.telephony.TelephonyManager;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
+
+import com.example.hellosdl2w.callservice.CallService;
+import com.example.hellosdl2w.callservice.OngoingCall;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -18,7 +22,7 @@ import java.lang.reflect.Method;
 public class PhoneStateReceiver extends BroadcastReceiver {
     public static Context context;
     public TelephonyManager tm = null;
-
+    public static String last_state = "";
     @Override
     public void onReceive(Context context, Intent intent) {
         this.context = context;
@@ -29,28 +33,34 @@ public class PhoneStateReceiver extends BroadcastReceiver {
             String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
 
             if (state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
+                last_state = state;
                 String phoneNum = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
                 String name = getContactName(phoneNum, context);
-                Toast.makeText(context, " On Call state: " + phoneNum + "-" + name, Toast.LENGTH_SHORT).show();
+                //Toast.makeText(context, " On Call state: " + phoneNum + "-" + name, Toast.LENGTH_SHORT).show();
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
                     instance.onInCommingCall(phoneNum);
                 }
-                rejectCall();
-
             }
 
             if ((state.equals(TelephonyManager.EXTRA_STATE_OFFHOOK))) {
-                String phoneNum = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
-                String name = getContactName(phoneNum,context);
-                Toast.makeText(context, " On Dial state: " + phoneNum + "-" + name,Toast.LENGTH_SHORT).show();
-                SdlService instance = SdlService.getInstance();
-                if (instance != null) {
-                    instance.onDial(phoneNum);
+                if (last_state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
+
+                }
+                else {
+                    String phoneNum = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+                    String name = getContactName(phoneNum,context);
+                    Toast.makeText(context, " On Dial state: " + phoneNum + "-" + name,Toast.LENGTH_SHORT).show();
+                    SdlService instance = SdlService.getInstance();
+                    if (instance != null) {
+                        instance.onDial(phoneNum);
+                    }
+
                 }
             }
 
             if (state.equals(TelephonyManager.EXTRA_STATE_IDLE)) {
+                last_state = "";
                 Toast.makeText(context, "Call end ", Toast.LENGTH_SHORT).show();
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
@@ -83,7 +93,6 @@ public class PhoneStateReceiver extends BroadcastReceiver {
 
     private void rejectCall(){
         try {
-
             // Get the getITelephony() method
             Class<?> classTelephony = Class.forName(tm.getClass().getName());
             Method method = classTelephony.getDeclaredMethod("getITelephony");

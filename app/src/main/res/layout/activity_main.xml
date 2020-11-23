@@ -8,83 +8,103 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="com.example.hellosdl2w.MainActivity">
-
-    <TextView
-        android:id="@+id/txtHello"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/hello_world" />
-
-    <EditText
-        android:id="@+id/editIP"
-        android:layout_below="@+id/txtHello"
-        android:text="192.168.1.9"
+    <RelativeLayout
+        android:id="@+id/tcpPart"
+        android:gravity="center_vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-    <EditText
-        android:text="12345"
-        android:inputType="number"
-        android:id="@+id/editPort"
-        android:layout_below="@+id/editIP"
+        android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/txtHello"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hello_world" />
+
+        <EditText
+            android:id="@+id/editIP"
+            android:layout_below="@+id/txtHello"
+            android:text="192.168.1.9"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/lb2dot"
+            android:layout_below="@+id/txtHello"
+            android:layout_toRightOf="@+id/editIP"
+            android:layout_alignBaseline="@id/editIP"
+            android:padding="10dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=":" />
+        <EditText
+            android:text="12345"
+            android:inputType="number"
+            android:id="@+id/editPort"
+            android:layout_below="@+id/txtHello"
+            android:layout_toRightOf="@+id/lb2dot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <Button
+            android:id="@+id/btConnect"
+            android:textAllCaps="false"
+            android:text="Connect"
+            android:layout_below="@+id/txtHello"
+            android:layout_toRightOf="@+id/editPort"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/smsPart"
+        android:layout_below="@+id/tcpPart"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-    <Button
-        android:id="@+id/btConnect"
-        android:textAllCaps="false"
-        android:text="Connect"
-        android:layout_below="@+id/editPort"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content">
 
-    <!-- EditText for entering a phone number  -->
-    <EditText
-        android:id="@+id/editText_main"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/btConnect"
-        android:layout_margin="@dimen/activity_horizontal_margin"
-        android:inputType="phone"
-        android:hint="@string/enter_phone" />
+        <!-- EditText for entering a phone number  -->
+        <EditText
+            android:id="@+id/editText_main"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="phone"
+            android:hint="@string/enter_phone" />
 
-    <!-- EditText for entering a message  -->
-    <EditText
-        android:id="@+id/sms_message"
-        android:layout_width="@dimen/edittext_width"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/editText_main"
-        android:layout_margin="@dimen/activity_horizontal_margin"
-        android:hint="@string/enter_message_here"
-        android:inputType="textMultiLine"/>
+        <!-- EditText for entering a message  -->
+        <EditText
+            android:id="@+id/sms_message"
+            android:layout_width="@dimen/edittext_width"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/editText_main"
+            android:hint="@string/enter_message_here"
+            android:inputType="textMultiLine"/>
 
-    <!-- The smsSendMessage() method will be called by this button.  -->
-    <ImageButton
-        android:id="@+id/message_icon"
-        android:contentDescription="@string/send_a_message"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/activity_vertical_margin"
-        android:layout_toRightOf="@id/sms_message"
-        android:layout_toEndOf="@id/sms_message"
-        android:layout_below="@id/editText_main"
-        android:src="@drawable/ic_message_black_24dp"
-        android:visibility="visible"
-        />
+        <!-- The smsSendMessage() method will be called by this button.  -->
+        <ImageButton
+            android:id="@+id/message_icon"
+            android:contentDescription="@string/send_a_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/sms_message"
+            android:layout_toEndOf="@id/sms_message"
+            android:layout_below="@id/editText_main"
+            android:src="@drawable/ic_message_black_24dp"
+            android:visibility="visible"
+            />
 
-    <!-- The retryApp() method will be called by this button.  -->
-    <Button
-        android:id="@+id/button_retry"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/retry"
-        android:layout_below="@id/sms_message"
-        android:text="@string/retry"
-        android:visibility="visible"
-        android:onClick="retryApp"/>
+        <!-- The retryApp() method will be called by this button.  -->
+        <Button
+            android:id="@+id/button_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/retry"
+            android:layout_below="@id/sms_message"
+            android:text="@string/retry"
+            android:visibility="visible"
+            android:onClick="retryApp"/>
+
+    </RelativeLayout>
 
     <TextView
         android:id="@+id/textSimulate"
-        android:layout_centerInParent="true"
-        android:layout_below="@+id/button_retry"
+        android:layout_below="@id/smsPart"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Click below buttons to simulate test">
@@ -93,10 +113,8 @@
     <RelativeLayout
         android:id="@+id/testBtnLayout"
         android:layout_width="match_parent"
-
         android:layout_height="wrap_content"
         android:layout_below="@+id/textSimulate">
-
         <Button
             android:id="@+id/btnInCall"
             android:layout_width="wrap_content"
