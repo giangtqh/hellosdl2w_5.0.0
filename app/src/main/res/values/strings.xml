@@ -31,6 +31,8 @@
     <string name="app_main_field4">"Oh shit"</string>
     <string name="phone">Phone</string>
     <string name="contact">Contact</string>
+    <string name="accept">Accept</string>
+    <string name="deny">Deny</string>
     <string name="sms">SMS</string>
 
     <!-- Welcome message -->

@@ -10,6 +10,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.telecom.TelecomManager;
 import android.telephony.SmsManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -18,6 +19,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -32,6 +34,15 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import kotlin.collections.ArraysKt;
+
+import static android.Manifest.permission.CALL_PHONE;
+import static android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER;
+import static android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME;
+import static androidx.core.content.PermissionChecker.PERMISSION_GRANTED;
+
 public class MainActivity extends AppCompatActivity {
     public ArrayList listcontact;
     public ListView list;
@@ -40,9 +51,9 @@ public class MainActivity extends AppCompatActivity {
     public static final String PORT = "com.example.PORT";
     public static final String ADDRESS = "com.example.ADDRESS";
 
+    private static final int MY_PERMISSIONS_REQUEST_PHONE_CALL = 0;
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     private static final int MY_PERMISSIONS_REQUEST_RECEIVE_SMS = 2;
-    private static final int MY_PERMISSIONS_REQUEST_READ_SMS = 3;
     private static final int MY_PERMISSIONS_REQUEST_READ_CONTACT = 3;
     private static final int MY_PERMISSIONS_REQUEST_READ_CALL_LOG = 4;
     private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_STATE = 5;
@@ -51,12 +62,22 @@ public class MainActivity extends AppCompatActivity {
     private static final int MY_PERMISSIONS_REQUEST_ANSWER_PHONE_CALL = 8;
     private static final int MY_PERMISSIONS_REQUEST_MANAGE_OWN_CALLS = 9 ;
     private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_NUMBERS = 10 ;
+    private static final int MY_PERMISSIONS_REQUEST_READ_SMS = 11;
+
+    EditText phoneNumberInput;
+
+    public static int REQUEST_PERMISSION = 0;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        ButterKnife.bind(this);
+
+        if (getIntent() != null && getIntent().getData() != null)
+            phoneNumberInput.setText(getIntent().getData().getSchemeSpecificPart());
+
         //If we are connected to a module we want to start our SdlService
         if (BuildConfig.TRANSPORT.equals("MULTI") || BuildConfig.TRANSPORT.equals("MULTI_HB")) {
             SdlReceiver.queryForConnectedService(this);
@@ -112,11 +133,11 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "inCall button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onInCommingCall("0967129109");
+                    instance.onInCommingCall("0372135181", "toan");
                 }
-                Intent callIntent = new Intent(Intent.ACTION_CALL);
-                callIntent.setData(Uri.parse("tel:" + 12345678));//change the number
-                startActivity(callIntent);
+//                Intent callIntent = new Intent(Intent.ACTION_CALL);
+//                callIntent.setData(Uri.parse("tel:" + 12345678));//change the number
+//                startActivity(callIntent);
             }
         });
 
@@ -125,11 +146,14 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Log.d(TAG, "onDial button clicked");
                 SdlService instance = SdlService.getInstance();
-                if (instance != null) {
-                    instance.onDial("0967129109");
-                } else {
-                    Log.d(TAG, "SdlService is not start.");
-                }
+//                if (instance != null) {
+//                    instance.onDial("0967129109");
+//                } else {
+//                    Log.d(TAG, "SdlService is not start.");
+//                }
+                Intent callIntent = new Intent(Intent.ACTION_CALL);
+                callIntent.setData(Uri.parse("tel:" + "0985231351"));//change the number
+                startActivity(callIntent);
             }
         });
 
@@ -239,6 +263,37 @@ public class MainActivity extends AppCompatActivity {
             cur.close();
 
         return nameList;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        offerReplacingDefaultDialer();
+
+//        phoneNumberInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+//            @Override
+//            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+//                makeCall();
+//                return true;
+//            }
+//        });
+    }
+
+//    private void makeCall() {
+//        if (androidx.core.content.PermissionChecker.checkSelfPermission(this, CALL_PHONE) == PERMISSION_GRANTED) {
+//            Uri uri = Uri.parse("tel:"+phoneNumberInput.getText().toString().trim());
+//            startActivity(new Intent(Intent.ACTION_CALL, uri));
+//        }
+//    }
+
+    private void offerReplacingDefaultDialer() {
+        TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
+
+        if (!getPackageName().equals(telecomManager.getDefaultDialerPackage())) {
+            Intent intent = new Intent(ACTION_CHANGE_DEFAULT_DIALER)
+                    .putExtra(EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
+            startActivity(intent);
+        }
     }
 
     /**
@@ -351,7 +406,6 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.READ_PHONE_NUMBERS},
                     MY_PERMISSIONS_REQUEST_READ_PHONE_NUMBERS);
         }
-
     }
 
     /**
@@ -365,6 +419,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_SEND_SMS: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -417,7 +472,12 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(), "Failed to obtain READ_SMS permission.",
                             Toast.LENGTH_LONG).show();
                 }
-            break;
+                break;
+            case MY_PERMISSIONS_REQUEST_PHONE_CALL:
+                if (ArraysKt.contains(grantResults, PERMISSION_GRANTED)) {
+//                    makeCall();
+                }
+                break;
         }
     }
 
