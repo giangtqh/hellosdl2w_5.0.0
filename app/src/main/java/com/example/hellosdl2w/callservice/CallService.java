@@ -10,7 +10,6 @@ public class CallService extends InCallService {
     @Override
     public void onCallAdded(Call call) {
         super.onCallAdded(call);
-        this.mycall = call;
         Toast.makeText(getApplicationContext(), "In call service ", Toast.LENGTH_SHORT).show();
         new OngoingCall().setCall(call);
         Log.d("SHIT", "onCallAdded");

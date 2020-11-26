@@ -33,12 +33,12 @@ public class OngoingCall {
         call = value;
     }
 
-    public void answer() {
+    public static void answer() {
         assert call != null;
         call.answer(VideoProfile.STATE_AUDIO_ONLY);
     }
 
-    public void hangup() {
+    public static void hangup() {
         assert call != null;
         call.disconnect();
     }

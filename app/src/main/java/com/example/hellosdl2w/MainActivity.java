@@ -133,11 +133,11 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "inCall button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onInCommingCall("0967129109");
+                    instance.onInCommingCall("0372135181", "toan");
                 }
-                Intent callIntent = new Intent(Intent.ACTION_CALL);
-                callIntent.setData(Uri.parse("tel:" + 12345678));//change the number
-                startActivity(callIntent);
+//                Intent callIntent = new Intent(Intent.ACTION_CALL);
+//                callIntent.setData(Uri.parse("tel:" + 12345678));//change the number
+//                startActivity(callIntent);
             }
         });
 
@@ -146,13 +146,13 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Log.d(TAG, "onDial button clicked");
                 SdlService instance = SdlService.getInstance();
-                if (instance != null) {
-                    instance.onDial("0967129109");
-                } else {
-                    Log.d(TAG, "SdlService is not start.");
-                }
+//                if (instance != null) {
+//                    instance.onDial("0967129109");
+//                } else {
+//                    Log.d(TAG, "SdlService is not start.");
+//                }
                 Intent callIntent = new Intent(Intent.ACTION_CALL);
-                callIntent.setData(Uri.parse("tel:" + "0372135181"));//change the number
+                callIntent.setData(Uri.parse("tel:" + "0985231351"));//change the number
                 startActivity(callIntent);
             }
         });

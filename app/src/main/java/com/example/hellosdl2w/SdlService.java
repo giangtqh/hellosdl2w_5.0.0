@@ -24,6 +24,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
+import com.example.hellosdl2w.callservice.OngoingCall;
 import com.google.gson.Gson;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
@@ -54,6 +55,7 @@ import com.smartdevicelink.proxy.rpc.OnButtonEvent;
 import com.smartdevicelink.proxy.rpc.OnButtonPress;
 import com.smartdevicelink.proxy.rpc.OnCommand;
 import com.smartdevicelink.proxy.rpc.OnHMIStatus;
+import com.smartdevicelink.proxy.rpc.SoftButton;
 import com.smartdevicelink.proxy.rpc.Speak;
 import com.smartdevicelink.proxy.rpc.TTSChunk;
 import com.smartdevicelink.proxy.rpc.enums.AppHMIType;
@@ -64,7 +66,9 @@ import com.smartdevicelink.proxy.rpc.enums.InteractionMode;
 import com.smartdevicelink.proxy.rpc.enums.Language;
 import com.smartdevicelink.proxy.rpc.enums.MenuLayout;
 import com.smartdevicelink.proxy.rpc.enums.PredefinedWindows;
+import com.smartdevicelink.proxy.rpc.enums.SoftButtonType;
 import com.smartdevicelink.proxy.rpc.enums.SpeechCapabilities;
+import com.smartdevicelink.proxy.rpc.enums.SystemAction;
 import com.smartdevicelink.proxy.rpc.enums.TextAlignment;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCNotificationListener;
@@ -120,9 +124,10 @@ public class SdlService extends Service {
     private static final int PHONE_BTN_ID = 100;
     private static final int CONTACT_BTN_ID = 101;
     private static final int SMS_BTN_ID = 102;
-    private static final int ACCEPT_BTN_ID = 103;
-    private static final int DENY_BTN_ID = 104;
-    private static final int MAKE_CALL_BTN_ID = 105;
+    private static final int ACCEPT_BTN_ID = 200;
+    private static final int DENY_BTN_ID = 203;
+    private static final int DIALING_BTN_ID = 202;
+
 
     // Contact commands ID range from 500->999, Phone: 1000->1999, SMS: 2000->2999
     private static int mContactCommandId = 500;
@@ -136,9 +141,8 @@ public class SdlService extends Service {
     private SoftButtonObject mPhoneSoftBtn = null;
     private SoftButtonObject mContactSoftBtn = null;
     private SoftButtonObject mSMSSoftBtn = null;
-    private SoftButtonObject mAcceptSoftBtn = null;
-    private SoftButtonObject mDenySoftBtn = null;
-    private SoftButtonObject mCallSoftBtn = null;
+    private SoftButton mAcceptSoftBtn = null;
+    private SoftButton mDenySoftBtn = null;
 
     private InfoType mActiveInfoType = InfoType.NONE; // Stores the current type of information being displayed
     private static SdlService instance = null;
@@ -185,6 +189,7 @@ public class SdlService extends Service {
 
         SoftButtonState mShowPhoneState = new SoftButtonState("mShowPhoneState", getResources().getString(R.string.phone), null);
         mPhoneSoftBtn = new SoftButtonObject("mPhoneSoftBtn", Collections.singletonList(mShowPhoneState), mShowPhoneState.getName(), new SoftButtonObject.OnEventListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
             @Override
             public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
                 mActiveInfoType = InfoType.PHONE;
@@ -235,66 +240,20 @@ public class SdlService extends Service {
         });
         mSMSSoftBtn.setButtonId(SMS_BTN_ID);
 
-        SoftButtonState mShowAcceptState = new SoftButtonState("mShowAcceptState", "AcceptCall",null);
-        mAcceptSoftBtn = new SoftButtonObject("mAcceptSoftBtn",Collections.singletonList(mShowAcceptState), mShowAcceptState.getName(), new SoftButtonObject.OnEventListener() {
-            @Override
-            public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
-                mActiveInfoType = InfoType.ACCEPT_CALL;
-                Toast.makeText(getApplicationContext(), "Accept call has clicked", Toast.LENGTH_LONG).show();
-                // accept call here
-                
-            }
-
-            @Override
-            public void onEvent(SoftButtonObject softButtonObject, OnButtonEvent onButtonEvent) {
-
-            }
-        });
-        mAcceptSoftBtn.setButtonId(ACCEPT_BTN_ID);
-
-        SoftButtonState mShowDenyState = new SoftButtonState("mShowDenyState", "DenyCall",null);
-        mDenySoftBtn = new SoftButtonObject("mDenySoftBtn",Collections.singletonList(mShowDenyState), mShowDenyState.getName(), new SoftButtonObject.OnEventListener() {
-            @Override
-            public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
-                mActiveInfoType = InfoType.DENY_CALL;
-                Toast.makeText(getApplicationContext(), "Deny/Cancel or Hangup call has clicked", Toast.LENGTH_LONG).show();
-                // deny call here
-                doEndCall();
-            }
-
-            @Override
-            public void onEvent(SoftButtonObject softButtonObject, OnButtonEvent onButtonEvent) {
-
-            }
-        });
-        mDenySoftBtn.setButtonId(DENY_BTN_ID);
-
-        SoftButtonState mShowCallState = new SoftButtonState("mShowCallState", "MakeCall",null);
-        mCallSoftBtn = new SoftButtonObject("mCallSoftBtn",Collections.singletonList(mShowCallState), mShowCallState.getName(), new SoftButtonObject.OnEventListener() {
-            @Override
-            public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
-                mActiveInfoType = InfoType.MAKE_CALL;
-                Toast.makeText(getApplicationContext(), "Make call has clicked", Toast.LENGTH_LONG).show();
-                // deny call here
-                makeCall("0372135181");
-            }
-
-            @Override
-            public void onEvent(SoftButtonObject softButtonObject, OnButtonEvent onButtonEvent) {
-
-            }
-        });
-        mCallSoftBtn.setButtonId(MAKE_CALL_BTN_ID);
-
-
         // TODO(GTR): Add soft buttons for PhoneCall(Accept, Deny, Cancel, Hangup), Contact List (Call, Message)
+        mDenySoftBtn = new SoftButton();
+        mDenySoftBtn.setSoftButtonID(DENY_BTN_ID);
+        mDenySoftBtn.setText(getResources().getString(R.string.deny));
+        mDenySoftBtn.setType(SoftButtonType.SBT_TEXT);
+        mDenySoftBtn.setIsHighlighted(false);
+        mDenySoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
 
-//		mPhoneSoftBtn = new SoftButton();
-//		mPhoneSoftBtn.setSoftButtonID(PHONE_BTN_ID);
-//		mPhoneSoftBtn.setText(getResources().getString(R.string.phone));
-//		mPhoneSoftBtn.setType(SoftButtonType.SBT_TEXT);
-//		mPhoneSoftBtn.setIsHighlighted(false);
-//		mPhoneSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
+        mAcceptSoftBtn = new SoftButton();
+        mAcceptSoftBtn.setSoftButtonID(ACCEPT_BTN_ID);
+        mAcceptSoftBtn.setText(getResources().getString(R.string.accept));
+        mAcceptSoftBtn.setType(SoftButtonType.SBT_TEXT);
+        mAcceptSoftBtn.setIsHighlighted(false);
+        mAcceptSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
 //
 //		mContactSoftBtn = new SoftButton();
 //		mContactSoftBtn.setSoftButtonID(CONTACT_BTN_ID);
@@ -435,6 +394,11 @@ public class SdlService extends Service {
                                 // Contact list commands
                             } else if (cmdId < 2000) {
                                 // Call log commands
+                                // find CallLog object respective with cmdID
+                                // make call()
+                                String phone_num = mMapCallLogCmdId.get(cmdId).number;
+                                Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
+                                makeCall(phone_num);
                                 // TODO(GTR): find call history with the cmdId, dial call, send Alert with "Cancel" button
                             } else if (cmdId < 3000) {
                                 // sms message commands
@@ -451,7 +415,23 @@ public class SdlService extends Service {
                         }
                     });
 
-
+                    sdlManager.addOnRPCNotificationListener(FunctionID.ON_BUTTON_PRESS, new OnRPCNotificationListener() {
+                        @Override
+                        public void onNotified(RPCNotification notification) {
+                            OnButtonPress buttonPress = (OnButtonPress) notification;
+                            int btnId = buttonPress.getCustomButtonID();
+                            switch (btnId) {
+                                case DENY_BTN_ID:
+                                    Toast.makeText(getApplicationContext(), "Oh shit, Deny button clicked", Toast.LENGTH_LONG).show();
+                                    OngoingCall.hangup();
+                                    break;
+                                case ACCEPT_BTN_ID:
+                                    Toast.makeText(getApplicationContext(), "Oh man, Accept button has clicked", Toast.LENGTH_LONG).show();
+                                    OngoingCall.answer();
+                                    break;
+                            }
+                        }
+                    });
                 }
 
                 @Override
@@ -713,6 +693,7 @@ public class SdlService extends Service {
         softButtons.add(mContactSoftBtn);
         softButtons.add(mSMSSoftBtn);
 
+
         // 4.6 still work
 //		Show showRequest = new Show();
 //		showRequest.setMainField1(getResources().getString(R.string.app_main_field1));
@@ -773,27 +754,36 @@ public class SdlService extends Service {
         //Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
     }
 
-    public void onInCommingCall(String number) {
+    public void onInCommingCall(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
+        alert.setAlertText3(name);
+        List<SoftButton> softBtns1 = new ArrayList<>();
+        softBtns1.add(mAcceptSoftBtn);
+        softBtns1.add(mDenySoftBtn);
+        alert.setSoftButtons(softBtns1);
         sdlManager.sendRPC(alert);
-        Toast.makeText(this, "Incomming call: " + number, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Incomming call: " + number + name, Toast.LENGTH_LONG).show();
     }
 
-    public void onDial(String number) {
+    public void onDial(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_DIAL");
         alert.setAlertText2(number);
+        alert.setAlertText3(name);
+        List<SoftButton> softBtns = new ArrayList<>();
+        softBtns.add(mDenySoftBtn);
+        alert.setSoftButtons(softBtns);
         sdlManager.sendRPC(alert);
-        Toast.makeText(this, "Dialing: " + number, Toast.LENGTH_LONG).show();
+        //Toast.makeText(this, "Dialing: " + number, Toast.LENGTH_LONG).show();
     }
 
     public void onEndCall() {
         Alert alert = new Alert();
         alert.setAlertText1("ON_END_CALL");
         sdlManager.sendRPC(alert);
-        Toast.makeText(this, "End call.", Toast.LENGTH_LONG).show();
+        //Toast.makeText(this, "End call.", Toast.LENGTH_LONG).show();
     }
 
     // Create call log list
@@ -951,6 +941,7 @@ public class SdlService extends Service {
     /**
      * Display the phone call history.
      */
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public void createCallLogList() {
         ArrayList<String> callHistory = new ArrayList<>();
         Uri uri = Uri.parse("content://call_log/calls");
@@ -961,10 +952,12 @@ public class SdlService extends Service {
             do {
                 String number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
                 String name = getContactNameSDL(number);
-                String duration = cursor.getString(cursor.getColumnIndex(CallLog.Calls.DURATION));
+                if(name.equals(""))
+                    name = "Unknown";
                 int type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
-                String date = cursor.getString(cursor.getColumnIndex(CallLog.Calls.DATE)).toString();
-                mCallLogMessage.add( new CallLogMessage(name,number,duration,date,type));
+                if (type > 3)
+                    type = 3;
+                mCallLogMessage.add( new CallLogMessage(name,number,type));
             }
             while (cursor.moveToNext());
         }
@@ -1003,10 +996,28 @@ public class SdlService extends Service {
         }
     }
 
+    private void deletePhoneCommands() {
+        if (mMapCmdIterator.hasNext()) {
+            final int cmdId = mMapCmdIterator.next();
+            DeleteCommand command = new DeleteCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapCmdIterator.remove();
+                    deleteCommands();
+                }
+            });
+            sdlManager.sendRPC(command);
+        } else {
+            mCallLogIterator = mCallLogMessage.iterator();
+            addCallLogCommands();
+        }
+    }
+
     public void showCallLogList() {
         if(mMapCallLogCmdId.size() > 0) {
             mMapCmdIterator = mMapCallLogCmdId.keySet().iterator();
-            deleteCommands();
+            deletePhoneCommands();
         } else {
             if (mCallLogMessage.size() > 0) {
                 mCallLogIterator = mCallLogMessage.iterator();
