@@ -32,7 +32,8 @@
     <string name="phone">Phone</string>
     <string name="contact">Contact</string>
     <string name="sms">SMS</string>
-
+    <string name="accept">Accept</string>
+    <string name="deny">Deny</string>
     <!-- Welcome message -->
     <string name="welcome_textfield1">"Welcome to"</string>
     <string name="welcome_textfield2">"Hello SDL2W"</string>
