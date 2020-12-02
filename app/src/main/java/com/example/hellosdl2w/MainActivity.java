@@ -70,7 +70,29 @@ public class MainActivity extends AppCompatActivity {
 
         // Check to see if SMS is enabled.
 //        checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
-        checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
+//        checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
+
+        // The request code used in ActivityCompat.requestPermissions()
+        // and returned in the Activity's onRequestPermissionsResult()
+        int PERMISSION_ALL = 50;
+        String[] PERMISSIONS = {
+                android.Manifest.permission.READ_CONTACTS,
+                android.Manifest.permission.RECEIVE_SMS,
+                android.Manifest.permission.SEND_SMS,
+                android.Manifest.permission.READ_SMS,
+                android.Manifest.permission.READ_CALL_LOG,
+                android.Manifest.permission.READ_PHONE_STATE,
+                android.Manifest.permission.CALL_PHONE,
+                android.Manifest.permission.ANSWER_PHONE_CALLS,
+                android.Manifest.permission.MANAGE_OWN_CALLS,
+                android.Manifest.permission.READ_PHONE_NUMBERS
+        };
+
+
+        if (!hasPermissions(this, PERMISSIONS)) {
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
+        }
+
         enableSmsButton();
         final ImageButton btnSendSms = (ImageButton) findViewById(R.id.message_icon);
         btnSendSms.setOnClickListener(new View.OnClickListener() {
@@ -130,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
         final Button loadSMS = (Button) findViewById(R.id.btnLoadSms);
         loadSMS.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
+//                checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
                 List<String> messages = new ArrayList<String>();
                 Uri uriSMSURI = Uri.parse("content://sms/");
                 Cursor cursor = getContentResolver().query(uriSMSURI, null, null, null, null);
@@ -154,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         //
-        checkForContactPermission();
+//        checkForContactPermission();
         final Button contactList = (Button) findViewById(R.id.btnContact);
         contactList.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -247,6 +269,17 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public static boolean hasPermissions(Context context, String... permissions) {
+        if (context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /**
      * Checks whether the app has Contact permission.
      */
@@ -272,6 +305,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
+        Log.d(TAG, "requestCode: "+requestCode);
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_SEND_SMS: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {

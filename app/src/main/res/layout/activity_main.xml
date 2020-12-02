@@ -138,7 +138,8 @@
             android:id="@+id/btnContact"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/btnInCall"
+            android:layout_below="@id/btnDial"
+            android:layout_toRightOf="@+id/btnLoadSms"
             android:text="Load Contact"
             android:textAllCaps="false" />
 
