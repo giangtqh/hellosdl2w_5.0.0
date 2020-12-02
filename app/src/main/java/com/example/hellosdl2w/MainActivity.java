@@ -121,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "inCall button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onInCommingCall("0967129109");
+                    instance.onInCommingCall("0967129109", "Unknown");
                 }
             }
         });
@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "onDial button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onDial("0967129109");
+                    instance.onDial("0967129109", "Unknown ");
                 } else {
                     Log.d(TAG, "SdlService is not start.");
                 }

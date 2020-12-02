@@ -709,7 +709,7 @@ public class SdlService extends Service {
         //Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
     }
 
-    public void onInCommingCall(String number) {
+    public void onInCommingCall(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
@@ -717,7 +717,7 @@ public class SdlService extends Service {
         //Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
     }
 
-    public void onDial(String number) {
+    public void onDial(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_DIAL");
         alert.setAlertText2(number);

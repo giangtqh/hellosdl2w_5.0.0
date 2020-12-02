@@ -78,6 +78,7 @@
                 <action android:name="sdl.router.startservice" />
             </intent-filter>
         </receiver>
+
         <receiver android:name=".SMSReceiver"
             android:enabled="true"
             android:exported="true"
@@ -86,6 +87,14 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
+
+        <receiver android:name=".PhoneStateReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name="com.smartdevicelink.managers.lockscreen.SDLLockScreenActivity"
             android:launchMode="singleTop" />
