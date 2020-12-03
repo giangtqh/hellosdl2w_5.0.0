@@ -76,7 +76,7 @@ public class PhoneStateReceiver extends BroadcastReceiver {
                 case "IDLE":
                     if(isRinginged || isOffHooked) {
                         x++;
-                        System.out.println("In idle :" + x + "---" + state);
+                        System.out.println("In idle :" + x + "----------------- " + state);
                         SdlService instanceIdle = SdlService.getInstance();
                         if (instanceIdle != null) {
                             instanceIdle.onEndCall();

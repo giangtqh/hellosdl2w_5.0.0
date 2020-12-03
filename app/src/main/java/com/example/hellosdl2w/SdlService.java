@@ -19,6 +19,7 @@ import android.widget.Toast;
 import android.content.ContentResolver;
 import android.provider.ContactsContract;
 
+import com.example.hellosdl2w.callservice.OngoingCall;
 import com.google.gson.Gson;
 import com.smartdevicelink.managers.CompletionListener;
 import com.smartdevicelink.managers.screen.OnButtonListener;
@@ -385,11 +386,11 @@ public class SdlService extends Service {
                             switch (btnId) {
                                     case DENY_BTN_ID:
                                             Toast.makeText(getApplicationContext(), "Oh shit, Deny button clicked", Toast.LENGTH_LONG).show();
-                                            // OngoingCall.hangup();
+                                            OngoingCall.hangup();
                                             break;
                                     case ACCEPT_BTN_ID:
                                             Toast.makeText(getApplicationContext(), "Oh man, Accept button has clicked", Toast.LENGTH_LONG).show();
-                                            // OngoingCall.answer();
+                                            OngoingCall.answer();
                                             break;
                                 }
                             }
@@ -561,18 +562,19 @@ public class SdlService extends Service {
                 String body = cursor.getString(cursor.getColumnIndex("body"));
                 String address = cursor.getString(cursor.getColumnIndex("address"));
                 String name = getNameByPhoneNumber(address);
-                if(name.equals(""))
-                    name = "Unknown";
+                if(!name.equals("")){
+                    address = name;
+                }
                 String date = cursor.getString(cursor.getColumnIndex("date"));
                 int read = cursor.getInt(cursor.getColumnIndex("read"));
                 int type = cursor.getInt(cursor.getColumnIndex("type"));
 //                for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
 //                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
 //                }
-                mSMSMessages.add(new SMSMessage(address, name, body, date, read, type));
+                mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
-            mSMSMessages.add(new SMSMessage("null", "null","null", "null", 0, 0));
+//            mSMSMessages.add(new SMSMessage("null","null", "null", 0, 0));
             Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
         }
 
@@ -633,9 +635,16 @@ public class SdlService extends Service {
         if (mMapSMSCmdId.size() > 0) {
             mMapCmdIterator = mMapSMSCmdId.keySet().iterator();
             deleteCommands();
-        } else if (mSMSMessages.size() > 0) {
-            mSMSIterator = mSMSMessages.iterator();
-            addSMSCommands();
+        } else {
+            if (mSMSMessages.size() > 0) {
+                mSMSIterator = mSMSMessages.iterator();
+                addSMSCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("SMS_FILLED");
+                sdlManager.sendRPC(alert);
+            }
         }
     }
 
@@ -681,9 +690,16 @@ public class SdlService extends Service {
         if ((mMapContactCmdId != null) && (mMapContactCmdId.size() > 0)) {
             mMapContactCmdIterator = mMapContactCmdId.keySet().iterator();
             deleteContactCommands();
-        } else if ((mContactList != null) && (mContactList.size() > 0)) {
-            mContactIterator = mContactList.iterator();
-            addContactCommands();
+        } else {
+            if ((mContactList != null) && (mContactList.size() > 0)) {
+                mContactIterator = mContactList.iterator();
+                addContactCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("CONTACT_FILLED");
+                sdlManager.sendRPC(alert);
+            }
         }
     }
 
@@ -753,12 +769,12 @@ public class SdlService extends Service {
                 int type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
                 if (type > 3)
                     type = 3;
-                mCallLogMessage.add( new CallLogItem(name,number, date, duration, type));
+                mCallLogMessage.add( new CallLogItem(name, number, date, duration, type));
                 }
             while (cursor.moveToNext());
             }
         else {
-            mCallLogMessage.add( new CallLogItem("null","null", "null", "null",0));
+            //mCallLogMessage.add( new CallLogItem("null","null", "null", "null",0));
         }
         if(cursor != null)
             cursor.close();
@@ -772,7 +788,7 @@ public class SdlService extends Service {
                 @Override
                 public void onResponse(int correlationId, RPCResponse response) {
                     mMapCmdIterator.remove();
-                    deleteCommands();
+                    deletePhoneCommands();
                 }
             });
             sdlManager.sendRPC(command);
@@ -819,6 +835,11 @@ public class SdlService extends Service {
             if ((mCallLogMessage != null) && (mCallLogMessage.size() > 0)) {
                 mCallLogIterator = mCallLogMessage.iterator();
                 addCallLogCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("CALL_LOG_FILLED");
+                sdlManager.sendRPC(alert);
             }
         }
     }
