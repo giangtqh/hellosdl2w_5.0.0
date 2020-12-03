@@ -55,7 +55,7 @@ public class SMSReceiver extends BroadcastReceiver {
 
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onSMSNotification(new SMSMessage(number, body, "", 0, 1));
+                    instance.onSMSNotification(new SMSMessage(number, "toan", body, "", 0, 1));
                 }
             }
         }
