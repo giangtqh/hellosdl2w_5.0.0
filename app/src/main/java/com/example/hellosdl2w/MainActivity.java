@@ -41,6 +41,22 @@ public class MainActivity extends AppCompatActivity {
     private static final int MY_PERMISSIONS_REQUEST_READ_CONTACT = 4;
     public ArrayList listcontact;
     public ListView list;
+    private static final int PERMISSION_ALL = 50;
+    public static boolean isContactPermissionGranted = false;
+
+    String[] PERMISSIONS = {
+            android.Manifest.permission.READ_CONTACTS,
+            android.Manifest.permission.RECEIVE_SMS,
+            android.Manifest.permission.SEND_SMS,
+            android.Manifest.permission.READ_SMS,
+            android.Manifest.permission.READ_CALL_LOG,
+            android.Manifest.permission.READ_PHONE_STATE,
+            android.Manifest.permission.CALL_PHONE,
+            android.Manifest.permission.ANSWER_PHONE_CALLS,
+            android.Manifest.permission.MANAGE_OWN_CALLS,
+            android.Manifest.permission.READ_PHONE_NUMBERS
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,8 +84,15 @@ public class MainActivity extends AppCompatActivity {
 //            startService(proxyIntent);
         }
 
+        // The request code used in ActivityCompat.requestPermissions()
+        // and returned in the Activity's onRequestPermissionsResult()
+
+        if (!hasPermissions(this, PERMISSIONS)) {
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
+        }
+
         // Check to see if SMS is enabled.
-//        checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
+
         checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
         enableSmsButton();
         final ImageButton btnSendSms = (ImageButton) findViewById(R.id.message_icon);
@@ -214,7 +237,6 @@ public class MainActivity extends AppCompatActivity {
             case MY_PERMISSIONS_REQUEST_RECEIVE_SMS:
                 if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECEIVE_SMS)
                         != PackageManager.PERMISSION_GRANTED) {
-
                     ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS},
                             MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
                 }
@@ -247,6 +269,16 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public static boolean hasPermissions(Context context, String... permissions) {
+        if (context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
     /**
      * Checks whether the app has Contact permission.
      */
@@ -258,6 +290,8 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.READ_CONTACTS},
                     MY_PERMISSIONS_REQUEST_READ_CONTACT);
+        } else {
+            isContactPermissionGranted = true;
         }
     }
 
@@ -272,7 +306,27 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
+        Log.d(TAG, "requestCode: "+requestCode);
         switch (requestCode) {
+            case PERMISSION_ALL: {
+                if (grantResults.length > 0) {
+                    for (int i = 0; i < PERMISSIONS.length; i ++) {
+                        Log.d(TAG, " Granted result for "+ PERMISSIONS[i] + " is: " + grantResults[i] );
+                    }
+                }
+            }
+            case MY_PERMISSIONS_REQUEST_READ_CONTACT: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission was granted.
+                    Log.d(TAG, "READ_CONTACT permission granted.");
+                    isContactPermissionGranted = true;
+                } else {
+                    // Permission denied.
+                    Log.d(TAG, "Failed to obtain READ_CONTACT permission.");
+                    Toast.makeText(getApplicationContext(), "Fail to obtain READ_CONTACT permission.",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
             case MY_PERMISSIONS_REQUEST_SEND_SMS: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // Permission was granted. Enable sms button.
@@ -292,7 +346,6 @@ public class MainActivity extends AppCompatActivity {
             case MY_PERMISSIONS_REQUEST_RECEIVE_SMS:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "RECEIVE_SMS permission granted.");
-//                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_SEND_SMS);
                     checkForSmsPermission(MY_PERMISSIONS_REQUEST_READ_SMS);
                 } else {
                     // Permission denied.
@@ -305,7 +358,6 @@ public class MainActivity extends AppCompatActivity {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "READ_SMS permission granted.");
                     checkForSmsPermission(MY_PERMISSIONS_REQUEST_SEND_SMS);
-//                    checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
                 } else {
                     // Permission denied.
                     Log.d(TAG, "Failed to obtain READ_SMS permission.");
