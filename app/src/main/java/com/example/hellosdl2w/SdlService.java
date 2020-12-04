@@ -15,6 +15,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
+import android.content.ContentResolver;
+import android.provider.ContactsContract;
 
 import com.google.gson.Gson;
 import com.smartdevicelink.managers.CompletionListener;
@@ -128,6 +130,10 @@ public class SdlService extends Service {
     Iterator<SMSMessage> mSMSIterator = null;
     Map<Integer, SMSMessage> mMapSMSCmdId = new HashMap<>();
     Iterator<Integer> mMapCmdIterator = null;
+    List<ContactItem> mContactList = null;
+    Iterator<ContactItem> mContactIterator = null;
+    Map<Integer, ContactItem> mMapContactCmdId = new HashMap<>();
+    Iterator<Integer> mMapContactCmdIterator = null;
     // variable used to increment correlation ID for every request sent to SDL
     private int mCmdPosIncIndex = 0;
     private Gson mGson = new Gson();
@@ -158,7 +164,6 @@ public class SdlService extends Service {
         Log.d(TAG, "onCreate");
         super.onCreate();
         SdlService.setInstance(this);
-
         SoftButtonState mShowPhoneState = new SoftButtonState("mShowPhoneState", getResources().getString(R.string.phone), null);
         mPhoneSoftBtn = new SoftButtonObject("mPhoneSoftBtn", Collections.singletonList(mShowPhoneState), mShowPhoneState.getName(), new SoftButtonObject.OnEventListener() {
             @Override
@@ -182,8 +187,8 @@ public class SdlService extends Service {
             public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
                 mActiveInfoType = InfoType.CONTACT;
                 Toast.makeText(getApplicationContext(), "Contact clicked", Toast.LENGTH_LONG).show();
-                createContactChoiceSet();
-                updateHmi();
+                createContactList();
+                sendContactList();
             }
 
             @Override
@@ -339,6 +344,7 @@ public class SdlService extends Service {
                                 //preloadChoices();
                                 //subscribeToButtons();
                                 showFeatures();
+                                //sendContactlist();
                                 //startAudioStream();
                             }
                         }
@@ -349,10 +355,13 @@ public class SdlService extends Service {
                         public void onNotified(RPCNotification notification) {
                             OnCommand onCommand = (OnCommand) notification;
                             int cmdId = onCommand.getCmdID();
-                            Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
+                            //Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
                             if (cmdId < 1000) {
-                                // TODO(GTR): find contact with cmdId, send Alert with 2 soft button for Call & Message
-                                // Contact list commands
+                                // TODO(GTR): call
+                                // make call()
+                                String phone_num = mMapContactCmdId.get(cmdId).number;
+                                Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId  + phone_num, Toast.LENGTH_LONG).show();
+//                                makeCall(phone_num);
                             } else if (cmdId < 2000) {
                                 // Call log commands
                                 // TODO(GTR): find call history with the cmdId, dial call, send Alert with "Cancel" button
@@ -678,7 +687,7 @@ public class SdlService extends Service {
                 performShowCallLog();
                 break;
             case CONTACT:
-                performShowContacts();
+                //performShowContacts();
                 break;
             case SMS:
                 showSMSList();
@@ -848,6 +857,93 @@ public class SdlService extends Service {
         } else if (mSMSMessages.size() > 0) {
             mSMSIterator = mSMSMessages.iterator();
             addSMSCommands();
+        }
+    }
+
+    private void createContactList() {
+        mContactList = new ArrayList<ContactItem>();
+        ContentResolver cr = getContentResolver();
+        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null,  null);
+
+        if ((cur != null ? cur.getCount() : 0) > 0) {
+            while (cur.moveToNext()) {
+                String id = cur.getString(
+                        cur.getColumnIndex(ContactsContract.Contacts._ID));
+                String name = cur.getString(cur.getColumnIndex(
+                        ContactsContract.Contacts.DISPLAY_NAME));
+                String phoneNo = "";
+                if (cur.getInt(cur.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
+                    Cursor pCur = cr.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null);
+                    if (pCur.moveToNext()) {
+                        phoneNo = pCur.getString(pCur.getColumnIndex(
+                                ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    }
+                    pCur.close();
+                }
+                mContactList.add ( new ContactItem(name, phoneNo));
+            }
+        }
+        if (cur != null)
+            cur.close();
+    }
+
+    public void sendContactList() {
+        if ((mMapContactCmdId != null) && (mMapContactCmdId.size() > 0)) {
+            mMapContactCmdIterator = mMapContactCmdId.keySet().iterator();
+            deleteContactCommands();
+        } else if ((mContactList != null) && (mContactList.size() > 0)) {
+            mContactIterator = mContactList.iterator();
+            addContactCommands();
+        }
+    }
+
+    private void addContactCommands() {
+        if ((mContactIterator != null) && (mContactIterator.hasNext())) {
+            final ContactItem item = mContactIterator.next();
+            final int cmdId = generateContactCmdId();
+            AddCommand command = new AddCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapContactCmdId.put(cmdId, item); // put succeed command id only
+                    addContactCommands();
+                }
+            });
+            String json = mGson.toJson(item);
+            MenuParams params = new MenuParams();
+            params.setMenuName(json);
+            command.setMenuParams(params);
+            sdlManager.sendRPC(command);
+        } else if (mContactList != null){
+            mCmdPosIncIndex = 0;
+            // reset iterator
+            mContactIterator = mContactList.iterator();
+            // Send an alert to notify list items finished
+            Alert alert = new Alert();
+            alert.setAlertText1("CONTACT_FILLED");
+            sdlManager.sendRPC(alert);
+        }
+    }
+
+    private void deleteContactCommands() {
+        if ((mMapContactCmdIterator != null) && (mMapContactCmdIterator.hasNext())) {
+            final int cmdId = mMapContactCmdIterator.next();
+            DeleteCommand command = new DeleteCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapContactCmdIterator.remove();
+                    deleteContactCommands();
+                }
+            });
+            sdlManager.sendRPC(command);
+        } else {
+            mContactIterator = mContactList.iterator();
+            addContactCommands();
         }
     }
 
