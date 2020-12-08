@@ -19,6 +19,7 @@ import android.widget.Toast;
 import android.content.ContentResolver;
 import android.provider.ContactsContract;
 
+import com.example.hellosdl2w.callservice.CallActivity;
 import com.example.hellosdl2w.callservice.OngoingCall;
 import com.google.gson.Gson;
 import com.smartdevicelink.managers.CompletionListener;
@@ -356,13 +357,12 @@ public class SdlService extends Service {
                             //Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
                             if (cmdId < 1000) {
                                 String phone_num = mMapContactCmdId.get(cmdId).number;
-                                Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId  + phone_num, Toast.LENGTH_LONG).show();
-                                // makeCall(phone_num);
+                                Toast.makeText(getApplicationContext(), "Makecall from contact " + phone_num, Toast.LENGTH_LONG).show();
+                                CallActivity.makeCall(getApplicationContext(), phone_num);
                             } else if (cmdId < 2000) {
-                                // Call log commands
                                 String phone_num = mMapCallLogCmdId.get(cmdId).number;
-                                Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
-                                // do make call here
+                                Toast.makeText(getApplicationContext(), "Makecall from CallLog " + phone_num, Toast.LENGTH_LONG).show();
+                                CallActivity.makeCall(getApplicationContext(), phone_num);
                             } else if (cmdId < 3000) {
                                 // sms message commands
                             } else {
