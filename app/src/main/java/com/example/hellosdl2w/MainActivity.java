@@ -10,25 +10,30 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.telecom.TelecomManager;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.Toast;
-
 import java.util.ArrayList;
 import java.util.List;
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import kotlin.collections.ArraysKt;
+import static android.Manifest.permission.CALL_PHONE;
+import static android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER;
+import static android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME;
+import static androidx.core.content.PermissionChecker.PERMISSION_GRANTED;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -57,11 +62,11 @@ public class MainActivity extends AppCompatActivity {
             android.Manifest.permission.READ_PHONE_NUMBERS
     };
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         //If we are connected to a module we want to start our SdlService
         if (BuildConfig.TRANSPORT.equals("MULTI") || BuildConfig.TRANSPORT.equals("MULTI_HB")) {
             SdlReceiver.queryForConnectedService(this);
@@ -121,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "inCall button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onInCommingCall("0967129109");
+                    instance.onInCommingCall("0967129109", "Unknown");
                 }
             }
         });
@@ -132,10 +137,13 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "onDial button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onDial("0967129109");
+                    instance.onDial("0967129109", "Unknown ");
                 } else {
                     Log.d(TAG, "SdlService is not start.");
                 }
+                Intent callIntent = new Intent(Intent.ACTION_CALL);
+                callIntent.setData(Uri.parse("tel:" + "0372135181"));//change the number
+                startActivity(callIntent);
             }
         });
 
@@ -452,5 +460,27 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        offerReplacingDefaultDialer();
+
+//        phoneNumberInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+//            @Override
+//            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+//                makeCall();
+//                return true;
+//            }
+//        });
+    }
+    private void offerReplacingDefaultDialer() {
+        TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
+        if (!getPackageName().equals(telecomManager.getDefaultDialerPackage())) {
+            Intent intent = new Intent(ACTION_CHANGE_DEFAULT_DIALER)
+                            .putExtra(EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
+            startActivity(intent);
+        }
     }
 }

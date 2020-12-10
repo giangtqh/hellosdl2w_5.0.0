@@ -13,11 +13,13 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.CallLog;
 import android.util.Log;
 import android.widget.Toast;
 import android.content.ContentResolver;
 import android.provider.ContactsContract;
 
+import com.example.hellosdl2w.callservice.OngoingCall;
 import com.google.gson.Gson;
 import com.smartdevicelink.managers.CompletionListener;
 import com.smartdevicelink.managers.screen.OnButtonListener;
@@ -45,6 +47,7 @@ import com.smartdevicelink.proxy.rpc.OnButtonEvent;
 import com.smartdevicelink.proxy.rpc.OnButtonPress;
 import com.smartdevicelink.proxy.rpc.OnCommand;
 import com.smartdevicelink.proxy.rpc.OnHMIStatus;
+import com.smartdevicelink.proxy.rpc.SoftButton;
 import com.smartdevicelink.proxy.rpc.Speak;
 import com.smartdevicelink.proxy.rpc.TTSChunk;
 import com.smartdevicelink.proxy.rpc.enums.AppHMIType;
@@ -55,7 +58,9 @@ import com.smartdevicelink.proxy.rpc.enums.InteractionMode;
 import com.smartdevicelink.proxy.rpc.enums.Language;
 import com.smartdevicelink.proxy.rpc.enums.MenuLayout;
 import com.smartdevicelink.proxy.rpc.enums.PredefinedWindows;
+import com.smartdevicelink.proxy.rpc.enums.SoftButtonType;
 import com.smartdevicelink.proxy.rpc.enums.SpeechCapabilities;
+import com.smartdevicelink.proxy.rpc.enums.SystemAction;
 import com.smartdevicelink.proxy.rpc.enums.TextAlignment;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCNotificationListener;
@@ -84,13 +89,6 @@ public class SdlService extends Service {
     private static final String APP_ID = "8678309";
 
     private static final String ICON_FILENAME = "hello_sdl_icon.png";
-    private static final String SDL_IMAGE_FILENAME = "sdl_full_image.png";
-
-    private static final String WELCOME_SHOW = "Welcome to HelloSDL";
-    private static final String WELCOME_SPEAK = "Welcome to Hello S D L";
-
-    private static final String TEST_COMMAND_NAME = "Test Command";
-
     private static final int FOREGROUND_SERVICE_ID = 111;
 
     // TCP/IP transport config
@@ -101,39 +99,42 @@ public class SdlService extends Service {
 
     // variable to create and call functions of the SyncProxy
     private SdlManager sdlManager = null;
-    private List<ChoiceCell> choiceCellList;
-    private List<ChoiceCell> mChoiceContactList;
-    private List<ChoiceCell> mChoiceSMSList;
 
-    private HMILevel currentHMILevel = HMILevel.HMI_NONE;
     private static final int PHONE_BTN_ID = 100;
     private static final int CONTACT_BTN_ID = 101;
     private static final int SMS_BTN_ID = 102;
+    private static final int ACCEPT_BTN_ID = 103;
+    private static final int DENY_BTN_ID = 104;
 
     // Contact commands ID range from 500->999, Phone: 1000->1999, SMS: 2000->2999
     private static int mContactCommandId = 500;
     private static int mPhoneCommandId = 1000;
     private static int mSMSCommandId = 2000;
-    // old
-//	private SoftButton mPhoneSoftBtn = null;
-//	private SoftButton mContactSoftBtn = null;
-//	private SoftButton mSMSSoftBtn = null;
-    // 4.7
+
+    // declare softbutton for Phone, Contact and SMS
     private SoftButtonObject mPhoneSoftBtn = null;
     private SoftButtonObject mContactSoftBtn = null;
     private SoftButtonObject mSMSSoftBtn = null;
+    private SoftButton mAcceptSoftBtn = null;
+    private SoftButton mDenySoftBtn = null;
 
     private InfoType mActiveInfoType = InfoType.NONE; // Stores the current type of information being displayed
     private static SdlService instance = null;
 
-    List<SMSMessage> mSMSMessages = null;
-    Iterator<SMSMessage> mSMSIterator = null;
-    Map<Integer, SMSMessage> mMapSMSCmdId = new HashMap<>();
-    Iterator<Integer> mMapCmdIterator = null;
-    List<ContactItem> mContactList = null;
-    Iterator<ContactItem> mContactIterator = null;
-    Map<Integer, ContactItem> mMapContactCmdId = new HashMap<>();
-    Iterator<Integer> mMapContactCmdIterator = null;
+    private List<SMSMessage> mSMSMessages = null;
+    private Iterator<SMSMessage> mSMSIterator = null;
+    private Map<Integer, SMSMessage> mMapSMSCmdId = new HashMap<>();
+
+    private List<ContactItem> mContactList = null;
+    private Iterator<ContactItem> mContactIterator = null;
+    private Map<Integer, ContactItem> mMapContactCmdId = new HashMap<>();
+
+    private List<CallLogItem> mCallLogMessage = null;
+    private Iterator<CallLogItem> mCallLogIterator = null;
+    private Map<Integer, CallLogItem> mMapCallLogCmdId = new HashMap<>();
+
+    private Iterator<Integer> mMapCmdIterator = null;
+    private Iterator<Integer> mMapContactCmdIterator = null;
     // variable used to increment correlation ID for every request sent to SDL
     private int mCmdPosIncIndex = 0;
     private Gson mGson = new Gson();
@@ -164,13 +165,15 @@ public class SdlService extends Service {
         Log.d(TAG, "onCreate");
         super.onCreate();
         SdlService.setInstance(this);
+
+        //softbutton for Phone
         SoftButtonState mShowPhoneState = new SoftButtonState("mShowPhoneState", getResources().getString(R.string.phone), null);
         mPhoneSoftBtn = new SoftButtonObject("mPhoneSoftBtn", Collections.singletonList(mShowPhoneState), mShowPhoneState.getName(), new SoftButtonObject.OnEventListener() {
             @Override
             public void onPress(SoftButtonObject softButtonObject, OnButtonPress onButtonPress) {
                 mActiveInfoType = InfoType.PHONE;
                 Toast.makeText(getApplicationContext(), "Phone clicked", Toast.LENGTH_LONG).show();
-                // TODO (Toan): Get call history
+                createCallLogList();
                 updateHmi();
             }
 
@@ -181,6 +184,7 @@ public class SdlService extends Service {
         });
         mPhoneSoftBtn.setButtonId(PHONE_BTN_ID);
 
+        //softbutton for Contact
         SoftButtonState mShowContactState = new SoftButtonState("mShowContactState", getResources().getString(R.string.contact), null);
         mContactSoftBtn = new SoftButtonObject("mContactSoftBtn", Collections.singletonList(mShowContactState), mShowContactState.getName(), new SoftButtonObject.OnEventListener() {
             @Override
@@ -198,6 +202,7 @@ public class SdlService extends Service {
         });
         mContactSoftBtn.setButtonId(CONTACT_BTN_ID);
 
+        //softbutton for SMS
         SoftButtonState mShowSMSState = new SoftButtonState("mShowSMSState", getResources().getString(R.string.sms), null);
         mSMSSoftBtn = new SoftButtonObject("mSMSSoftBtn", Collections.singletonList(mShowSMSState), mShowSMSState.getName(), new SoftButtonObject.OnEventListener() {
             @Override
@@ -215,28 +220,21 @@ public class SdlService extends Service {
         });
         mSMSSoftBtn.setButtonId(SMS_BTN_ID);
 
-        // TODO(GTR): Add soft buttons for PhoneCall(Accept, Deny, Cancel, Hangup), Contact List (Call, Message)
+        //Define softbutton for Accept and Deny Call
+        mDenySoftBtn = new SoftButton();
+        mDenySoftBtn.setSoftButtonID(DENY_BTN_ID);
+        mDenySoftBtn.setText(getResources().getString(R.string.deny));
+        mDenySoftBtn.setType(SoftButtonType.SBT_TEXT);
+        mDenySoftBtn.setIsHighlighted(false);
+        mDenySoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
 
-//		mPhoneSoftBtn = new SoftButton();
-//		mPhoneSoftBtn.setSoftButtonID(PHONE_BTN_ID);
-//		mPhoneSoftBtn.setText(getResources().getString(R.string.phone));
-//		mPhoneSoftBtn.setType(SoftButtonType.SBT_TEXT);
-//		mPhoneSoftBtn.setIsHighlighted(false);
-//		mPhoneSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
-//
-//		mContactSoftBtn = new SoftButton();
-//		mContactSoftBtn.setSoftButtonID(CONTACT_BTN_ID);
-//		mContactSoftBtn.setText(getResources().getString(R.string.contact));
-//		mContactSoftBtn.setType(SoftButtonType.SBT_TEXT);
-//		mContactSoftBtn.setIsHighlighted(false);
-//		mContactSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
-//
-//		mSMSSoftBtn = new SoftButton();
-//		mSMSSoftBtn.setSoftButtonID(SMS_BTN_ID);
-//		mSMSSoftBtn.setText(getResources().getString(R.string.sms));
-//		mSMSSoftBtn.setType(SoftButtonType.SBT_TEXT);
-//		mSMSSoftBtn.setIsHighlighted(false);
-//		mSMSSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
+        mAcceptSoftBtn = new SoftButton();
+        mAcceptSoftBtn.setSoftButtonID(ACCEPT_BTN_ID);
+        mAcceptSoftBtn.setText(getResources().getString(R.string.accept));
+        mAcceptSoftBtn.setType(SoftButtonType.SBT_TEXT);
+        mAcceptSoftBtn.setIsHighlighted(false);
+        mAcceptSoftBtn.setSystemAction(SystemAction.DEFAULT_ACTION);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             enterForeground();
         }
@@ -357,14 +355,14 @@ public class SdlService extends Service {
                             int cmdId = onCommand.getCmdID();
                             //Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
                             if (cmdId < 1000) {
-                                // TODO(GTR): call
-                                // make call()
                                 String phone_num = mMapContactCmdId.get(cmdId).number;
                                 Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId  + phone_num, Toast.LENGTH_LONG).show();
-//                                makeCall(phone_num);
+                                // makeCall(phone_num);
                             } else if (cmdId < 2000) {
                                 // Call log commands
-                                // TODO(GTR): find call history with the cmdId, dial call, send Alert with "Cancel" button
+                                String phone_num = mMapCallLogCmdId.get(cmdId).number;
+                                Toast.makeText(getApplicationContext(), "onCommand Id: " + cmdId, Toast.LENGTH_LONG).show();
+                                // do make call here
                             } else if (cmdId < 3000) {
                                 // sms message commands
                             } else {
@@ -380,6 +378,23 @@ public class SdlService extends Service {
                         }
                     });
 
+                    sdlManager.addOnRPCNotificationListener(FunctionID.ON_BUTTON_PRESS, new OnRPCNotificationListener() {
+                        @Override
+                        public void onNotified(RPCNotification notification) {
+                            OnButtonPress buttonPress = (OnButtonPress) notification;
+                            int btnId = buttonPress.getCustomButtonID();
+                            switch (btnId) {
+                                    case DENY_BTN_ID:
+                                            Toast.makeText(getApplicationContext(), "Oh shit, Deny button clicked", Toast.LENGTH_LONG).show();
+                                            OngoingCall.hangup();
+                                            break;
+                                    case ACCEPT_BTN_ID:
+                                            Toast.makeText(getApplicationContext(), "Oh man, Accept button has clicked", Toast.LENGTH_LONG).show();
+                                            OngoingCall.answer();
+                                            break;
+                                }
+                            }
+                    });
 
                 }
 
@@ -444,203 +459,7 @@ public class SdlService extends Service {
     }
 
     /**
-     * Send some voice commands
-     */
-    private void setVoiceCommands() {
-
-        List<String> list1 = Collections.singletonList("Command One");
-        List<String> list2 = Collections.singletonList("Command two");
-
-        VoiceCommand voiceCommand1 = new VoiceCommand(list1, new VoiceCommandSelectionListener() {
-            @Override
-            public void onVoiceCommandSelected() {
-                Log.i(TAG, "Voice Command 1 triggered");
-            }
-        });
-
-        VoiceCommand voiceCommand2 = new VoiceCommand(list2, new VoiceCommandSelectionListener() {
-            @Override
-            public void onVoiceCommandSelected() {
-                Log.i(TAG, "Voice Command 2 triggered");
-            }
-        });
-
-        sdlManager.getScreenManager().setVoiceCommands(Arrays.asList(voiceCommand1, voiceCommand2));
-    }
-
-    /**
-     * Add menus for the app on SDL.
-     */
-    private void sendMenus() {
-
-        // some arts
-        SdlArtwork livio = new SdlArtwork("livio", FileType.GRAPHIC_PNG, R.drawable.sdl, false);
-
-        // some voice commands
-        List<String> voice2 = Collections.singletonList("Cell two");
-
-        MenuCell mainCell1 = new MenuCell("Test Cell 1 (speak)", livio, null, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                Log.i(TAG, "Test cell 1 triggered. Source: " + trigger.toString());
-                showTest();
-            }
-        });
-
-        MenuCell mainCell2 = new MenuCell("Test Cell 2", null, voice2, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                Log.i(TAG, "Test cell 2 triggered. Source: " + trigger.toString());
-            }
-        });
-
-        // SUB MENU
-
-        MenuCell subCell1 = new MenuCell("SubCell 1", null, null, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                Log.i(TAG, "Sub cell 1 triggered. Source: " + trigger.toString());
-            }
-        });
-
-        MenuCell subCell2 = new MenuCell("SubCell 2", null, null, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                Log.i(TAG, "Sub cell 2 triggered. Source: " + trigger.toString());
-            }
-        });
-
-        // sub menu parent cell
-        MenuCell mainCell3 = new MenuCell("Test Cell 3 (sub menu)", MenuLayout.LIST, null, Arrays.asList(subCell1, subCell2));
-
-        MenuCell mainCell4 = new MenuCell("Show Perform Interaction", null, null, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                showPerformInteraction();
-            }
-        });
-
-        MenuCell mainCell5 = new MenuCell("Clear the menu", null, null, new MenuSelectionListener() {
-            @Override
-            public void onTriggered(TriggerSource trigger) {
-                Log.i(TAG, "Clearing Menu. Source: " + trigger.toString());
-                // Clear this thing
-                sdlManager.getScreenManager().setMenu(Collections.<MenuCell>emptyList());
-                showAlert("Menu Cleared");
-            }
-        });
-
-        // Send the entire menu off to be created
-        sdlManager.getScreenManager().setMenu(Arrays.asList(mainCell1, mainCell2, mainCell3, mainCell4, mainCell5));
-    }
-
-    /**
-     * Will speak a sample welcome message
-     */
-    private void performWelcomeSpeak() {
-        List<TTSChunk> chunks = Collections.singletonList(new TTSChunk(WELCOME_SPEAK, SpeechCapabilities.TEXT));
-        sdlManager.sendRPC(new Speak(chunks));
-    }
-
-    /**
-     * Use the Screen Manager to set the initial screen text and set the image.
-     * Because we are setting multiple items, we will call beginTransaction() first,
-     * and finish with commit() when we are done.
-     */
-    private void performWelcomeShow() {
-        sdlManager.getScreenManager().beginTransaction();
-        sdlManager.getScreenManager().setTextField1(APP_NAME);
-        sdlManager.getScreenManager().setTextField2(WELCOME_SHOW);
-        sdlManager.getScreenManager().setPrimaryGraphic(new SdlArtwork(SDL_IMAGE_FILENAME, FileType.GRAPHIC_PNG, R.drawable.sdl, true));
-        sdlManager.getScreenManager().commit(new CompletionListener() {
-            @Override
-            public void onComplete(boolean success) {
-                if (success) {
-                    Log.i(TAG, "welcome show successful");
-                }
-            }
-        });
-    }
-
-    /**
-     * Attempts to Subscribe to all preset buttons
-     */
-    private void subscribeToButtons() {
-        ButtonName[] buttonNames = {ButtonName.PLAY_PAUSE, ButtonName.SEEKLEFT, ButtonName.SEEKRIGHT, ButtonName.AC_MAX, ButtonName.AC, ButtonName.RECIRCULATE,
-                ButtonName.FAN_UP, ButtonName.FAN_DOWN, ButtonName.TEMP_UP, ButtonName.TEMP_DOWN, ButtonName.FAN_DOWN, ButtonName.DEFROST_MAX, ButtonName.DEFROST_REAR, ButtonName.DEFROST,
-                ButtonName.UPPER_VENT, ButtonName.LOWER_VENT, ButtonName.VOLUME_UP, ButtonName.VOLUME_DOWN, ButtonName.EJECT, ButtonName.SOURCE, ButtonName.SHUFFLE, ButtonName.REPEAT};
-
-        OnButtonListener onButtonListener = new OnButtonListener() {
-            @Override
-            public void onPress(ButtonName buttonName, OnButtonPress buttonPress) {
-                sdlManager.getScreenManager().setTextField1(buttonName + " pressed");
-            }
-
-            @Override
-            public void onEvent(ButtonName buttonName, OnButtonEvent buttonEvent) {
-                sdlManager.getScreenManager().setTextField2(buttonName + " " + buttonEvent.getButtonEventMode());
-            }
-
-            @Override
-            public void onError(String info) {
-                Log.i(TAG, "onError: " + info);
-            }
-        };
-
-        for (ButtonName buttonName : buttonNames) {
-            sdlManager.getScreenManager().addButtonListener(buttonName, onButtonListener);
-        }
-    }
-
-    /**
-     * Will show a sample test message on screen as well as speak a sample test message
-     */
-    private void showTest() {
-        sdlManager.getScreenManager().beginTransaction();
-        sdlManager.getScreenManager().setTextField1("Test Cell 1 has been selected");
-        sdlManager.getScreenManager().setTextField2("");
-        sdlManager.getScreenManager().commit(null);
-
-        List<TTSChunk> chunks = Collections.singletonList(new TTSChunk(TEST_COMMAND_NAME, SpeechCapabilities.TEXT));
-        sdlManager.sendRPC(new Speak(chunks));
-    }
-
-    private void showAlert(String text) {
-        Alert alert = new Alert();
-        alert.setAlertText1(text);
-        alert.setDuration(5000);
-        sdlManager.sendRPC(alert);
-    }
-
-    // Choice Set
-
-    private void preloadChoices() {
-        ChoiceCell cell1 = new ChoiceCell("Item 1");
-        ChoiceCell cell2 = new ChoiceCell("Item 2");
-        ChoiceCell cell3 = new ChoiceCell("Item 3");
-        choiceCellList = new ArrayList<>(Arrays.asList(cell1, cell2, cell3));
-        sdlManager.getScreenManager().preloadChoices(choiceCellList, null);
-    }
-
-    private void showPerformInteraction() {
-        if (choiceCellList != null) {
-            ChoiceSet choiceSet = new ChoiceSet("Choose an Item from the list", choiceCellList, new ChoiceSetSelectionListener() {
-                @Override
-                public void onChoiceSelected(ChoiceCell choiceCell, TriggerSource triggerSource, int rowIndex) {
-                    showAlert(choiceCell.getText() + " was selected");
-                }
-
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "There was an error showing the perform interaction: " + error);
-                }
-            });
-            sdlManager.getScreenManager().presentChoiceSet(choiceSet, InteractionMode.MANUAL_ONLY);
-        }
-    }
-
-    /**
-     * Shows and speaks a welcome message
+     * Shows figure
      */
     private void showFeatures() {
         // 4.7 change SoftButton to SoftButtonObject
@@ -648,19 +467,6 @@ public class SdlService extends Service {
         softButtons.add(mPhoneSoftBtn);
         softButtons.add(mContactSoftBtn);
         softButtons.add(mSMSSoftBtn);
-
-        // 4.6 still work
-//		Show showRequest = new Show();
-//		showRequest.setMainField1(getResources().getString(R.string.app_main_field1));
-//		showRequest.setMainField2(getResources().getString(R.string.app_main_field2));
-//		showRequest.setMainField3(getResources().getString(R.string.app_main_field3));
-//		showRequest.setMainField4(getResources().getString(R.string.welcome_textfield4));
-//		showRequest.setAlignment(TextAlignment.CENTERED);
-//		mWelcomeCorrId = CorrelationIdGenerator.generateId();
-//		showRequest.setCorrelationID(mWelcomeCorrId);
-//		showRequest.setSoftButtons(softButtons);
-////			proxy.sendRPCRequest(showRequest);
-//		sdlManager.sendRPC(showRequest);
 
         // 4.7
         sdlManager.getScreenManager().beginTransaction();
@@ -684,10 +490,10 @@ public class SdlService extends Service {
     private void updateHmi() {
         switch (mActiveInfoType) {
             case PHONE:
-                performShowCallLog();
+                showCallLogList();
                 break;
             case CONTACT:
-                //performShowContacts();
+
                 break;
             case SMS:
                 showSMSList();
@@ -709,18 +515,27 @@ public class SdlService extends Service {
         //Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
     }
 
-    public void onInCommingCall(String number) {
+    public void onInCommingCall(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
+        alert.setAlertText3(name);
+        List<SoftButton> softBtns1 = new ArrayList<>();
+        softBtns1.add(mAcceptSoftBtn);
+        softBtns1.add(mDenySoftBtn);
+        alert.setSoftButtons(softBtns1);
         sdlManager.sendRPC(alert);
-        //Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Incomming call", Toast.LENGTH_LONG).show();
     }
 
-    public void onDial(String number) {
+    public void onDial(String number, String name) {
         Alert alert = new Alert();
         alert.setAlertText1("ON_DIAL");
         alert.setAlertText2(number);
+        alert.setAlertText3(name);
+        List<SoftButton> softBtns = new ArrayList<>();
+        softBtns.add(mDenySoftBtn);
+        alert.setSoftButtons(softBtns);
         sdlManager.sendRPC(alert);
         Toast.makeText(this, "Dialing " + number, Toast.LENGTH_LONG).show();
     }
@@ -732,40 +547,10 @@ public class SdlService extends Service {
         Toast.makeText(this, "End call.", Toast.LENGTH_LONG).show();
     }
 
-    private void createContactChoiceSet() {
-        // TODO(Toan): Use real contact list
-        List<String> dummyContacts = new ArrayList<>(Arrays.asList(
-                "Bui Le Thuan",
-                "Nguyen Hoang An",
-                "Dinh Cong Toan",
-                "Nguyen Thanh Dung",
-                "Tran Quang Hoang Giang"
-        ));
 
-        mChoiceContactList = new ArrayList<>();
-        for (String item : dummyContacts) {
-            mChoiceContactList.add(new ChoiceCell(item));
-        }
-        sdlManager.getScreenManager().preloadChoices(mChoiceContactList, null);
-    }
-
-    private void performShowContacts() {
-        ChoiceSet choiceSet = new ChoiceSet("Choose an Item from the list", mChoiceContactList, new ChoiceSetSelectionListener() {
-            @Override
-            public void onChoiceSelected(ChoiceCell choiceCell, TriggerSource triggerSource, int rowIndex) {
-                showAlert(choiceCell.getText() + " was selected");
-                Toast.makeText(getApplicationContext(), choiceCell.getText() + " was selected", Toast.LENGTH_LONG).show();
-            }
-
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "There was an error showing the perform interaction: " + error);
-            }
-        });
-        sdlManager.getScreenManager().presentChoiceSet(choiceSet, InteractionMode.MANUAL_ONLY);
-
-    }
-
+    /**
+     * Display the SMS log.
+     */
     private void createSMSList() {
         mSMSMessages = new ArrayList<SMSMessage>();
         // get all sms messages includes inbox and sent
@@ -776,6 +561,10 @@ public class SdlService extends Service {
             do {
                 String body = cursor.getString(cursor.getColumnIndex("body"));
                 String address = cursor.getString(cursor.getColumnIndex("address"));
+                String name = getNameByPhoneNumber(address);
+                if(!name.equals("")){
+                    address = name;
+                }
                 String date = cursor.getString(cursor.getColumnIndex("date"));
                 int read = cursor.getInt(cursor.getColumnIndex("read"));
                 int type = cursor.getInt(cursor.getColumnIndex("type"));
@@ -785,21 +574,13 @@ public class SdlService extends Service {
                 mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
+//            mSMSMessages.add(new SMSMessage("null","null", "null", 0, 0));
             Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
         }
 
         if (cursor != null) {
             cursor.close();
         }
-    }
-
-    private void sendCommands() {
-        AddCommand command = new AddCommand();
-        MenuParams params = new MenuParams();
-        params.setMenuName("Giang Test menu AddCommand");
-        command.setCmdID(9999);
-        command.setMenuParams(params);
-        sdlManager.sendRPC(command);
     }
 
     private void deleteCommands() {
@@ -854,12 +635,22 @@ public class SdlService extends Service {
         if (mMapSMSCmdId.size() > 0) {
             mMapCmdIterator = mMapSMSCmdId.keySet().iterator();
             deleteCommands();
-        } else if (mSMSMessages.size() > 0) {
-            mSMSIterator = mSMSMessages.iterator();
-            addSMSCommands();
+        } else {
+            if (mSMSMessages.size() > 0) {
+                mSMSIterator = mSMSMessages.iterator();
+                addSMSCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("SMS_FILLED");
+                sdlManager.sendRPC(alert);
+            }
         }
     }
 
+    /**
+     * Display the contact list.
+     */
     private void createContactList() {
         mContactList = new ArrayList<ContactItem>();
         ContentResolver cr = getContentResolver();
@@ -887,6 +678,10 @@ public class SdlService extends Service {
                 mContactList.add ( new ContactItem(name, phoneNo));
             }
         }
+        else {
+            // no data in contact list
+            mContactList.add ( new ContactItem("null", "null"));
+        }
         if (cur != null)
             cur.close();
     }
@@ -895,9 +690,16 @@ public class SdlService extends Service {
         if ((mMapContactCmdId != null) && (mMapContactCmdId.size() > 0)) {
             mMapContactCmdIterator = mMapContactCmdId.keySet().iterator();
             deleteContactCommands();
-        } else if ((mContactList != null) && (mContactList.size() > 0)) {
-            mContactIterator = mContactList.iterator();
-            addContactCommands();
+        } else {
+            if ((mContactList != null) && (mContactList.size() > 0)) {
+                mContactIterator = mContactList.iterator();
+                addContactCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("CONTACT_FILLED");
+                sdlManager.sendRPC(alert);
+            }
         }
     }
 
@@ -950,8 +752,110 @@ public class SdlService extends Service {
     /**
      * Display the phone call history.
      */
-    private void performShowCallLog() {
-        // TODO(Toan):
+    private void createCallLogList() {
+        mCallLogMessage = new ArrayList<CallLogItem>();
+        Uri uri = Uri.parse("content://call_log/calls");
+        Cursor cursor = getContentResolver().query(uri, null ,null,null);
+
+        assert cursor != null;
+        if(cursor.moveToFirst()){
+            do {
+                String number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
+                String name = getNameByPhoneNumber(number);
+                if (name.equals(""))
+                    name = "Unknown";
+                String duration = cursor.getString(cursor.getColumnIndex(CallLog.Calls.DURATION));
+                String date = cursor.getString(cursor.getColumnIndex(CallLog.Calls.DATE)).toString();
+                int type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
+                if (type > 3)
+                    type = 3;
+                mCallLogMessage.add( new CallLogItem(name, number, date, duration, type));
+                }
+            while (cursor.moveToNext());
+            }
+        else {
+            //mCallLogMessage.add( new CallLogItem("null","null", "null", "null",0));
+        }
+        if(cursor != null)
+            cursor.close();
+    }
+
+    private void deletePhoneCommands() {
+        if (mMapCmdIterator.hasNext()) {
+            final int cmdId = mMapCmdIterator.next();
+            DeleteCommand command = new DeleteCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapCmdIterator.remove();
+                    deletePhoneCommands();
+                }
+            });
+            sdlManager.sendRPC(command);
+        } else {
+            mCallLogIterator = mCallLogMessage.iterator();
+            addCallLogCommands();
+        }
+    }
+
+
+    private void addCallLogCommands(){
+        if (mCallLogIterator.hasNext()) {
+            final CallLogItem item = mCallLogIterator.next();
+            final int cmdId = generatePhoneCmdId();
+            AddCommand command = new AddCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapCallLogCmdId.put(cmdId,item);
+                    addCallLogCommands();
+                }
+            });
+            String json = mGson.toJson(item);
+            MenuParams params = new MenuParams();
+            params.setMenuName(json);
+            command.setMenuParams(params);
+            sdlManager.sendRPC(command);
+        } else {
+            mCmdPosIncIndex = 0;
+            // reset iterator
+            mCallLogIterator = mCallLogMessage.iterator();
+            // Send an alert to notify list items finished
+            Alert alert = new Alert();
+            alert.setAlertText1("CALL_LOG_FILLED");
+            sdlManager.sendRPC(alert);
+        }
+    }
+
+    public void showCallLogList() {
+        if (mMapCallLogCmdId.size() > 0) {
+            mMapCmdIterator = mMapCallLogCmdId.keySet().iterator();
+            deletePhoneCommands();
+        } else {
+            if ((mCallLogMessage != null) && (mCallLogMessage.size() > 0)) {
+                mCallLogIterator = mCallLogMessage.iterator();
+                addCallLogCommands();
+            }
+            else {
+                Alert alert = new Alert();
+                alert.setAlertText1("CALL_LOG_FILLED");
+                sdlManager.sendRPC(alert);
+            }
+        }
+    }
+
+    public String getNameByPhoneNumber(String phoneNumber) {
+        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI,Uri.encode(phoneNumber));
+        String[] projection = new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME};
+        String contactName = "";
+        Cursor cursor = getContentResolver().query(uri,projection,null,null,null);
+        if (cursor != null) {
+            if(cursor.moveToFirst()) {
+                contactName = cursor.getString(0);
+            }
+            cursor.close();
+        }
+        return contactName;
     }
 
     private int generateContactCmdId() {

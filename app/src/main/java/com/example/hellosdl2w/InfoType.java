@@ -1,8 +1,8 @@
 package com.example.hellosdl2w;
 
 /**
- * Different weather information types that can be displayed. 
+ * Different softbuttons types that can be called.
  */
 public enum InfoType {
-	PHONE, CONTACT, SMS, NONE;
+	PHONE, CONTACT, SMS, ACCEPT_CALL, DENY_CALL, NONE;
 }
