@@ -3,6 +3,7 @@ package com.example.hellosdl2w.callservice;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.telecom.Call;
 import android.util.Log;
@@ -135,4 +136,13 @@ public class CallActivity extends AppCompatActivity {
                 .setData(call.getDetails().getHandle());
         context.startActivity(intent);
     }
+    public static void makeCall(Context context, String phoneNumber) {
+
+        Intent intent = new Intent(Intent.ACTION_CALL);
+        intent.setData(Uri.parse("tel:" + phoneNumber));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_FROM_BACKGROUND);
+        context.startActivity(intent);
+    }
+
 }
