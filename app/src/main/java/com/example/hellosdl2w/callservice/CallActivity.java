@@ -17,6 +17,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import com.example.hellosdl2w.R;
+import com.example.hellosdl2w.SdlService;
+
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
@@ -85,6 +87,24 @@ public class CallActivity extends AppCompatActivity {
                             }
                         }));
 
+        disposables.add(OngoingCall.state.filter(new Predicate<Integer>() {
+            @Override
+            public boolean test(Integer integer) throws Exception {
+                return integer == Call.STATE_ACTIVE;
+            }
+        })
+                .firstElement()
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        Log.d("SHIT", "SHIT: SHIT");
+                        SdlService instanceHook = SdlService.getInstance();
+                        if (instanceHook != null) {
+                            instanceHook.onStartCall();
+                        }
+                    }
+                }));
+
         disposables.add(
                 OngoingCall.state
                         .filter(new Predicate<Integer>() {
@@ -106,7 +126,7 @@ public class CallActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     private Consumer<? super Integer> updateUi(Integer state) {
-        Log.d("SHIT", "updateUi state: " + state);
+        Log.d("SHIT", "updateUi state: " + asString(state));
         callInfo.setText(asString(state) + "\n" + number);
 
         if (state != Call.STATE_RINGING) {
