@@ -575,8 +575,9 @@ public class SdlService extends Service {
                 int read = cursor.getInt(cursor.getColumnIndex("read"));
                 int type = cursor.getInt(cursor.getColumnIndex("type"));
                 if (body.length() > 400) {
-                    body.substring(0,400);
+                    body = body.substring(0,400);
                 }
+                body = body.replaceAll("[\\n\\t]+"," ");
                 mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
