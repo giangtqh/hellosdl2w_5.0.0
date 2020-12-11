@@ -46,6 +46,7 @@ public class SMSReceiver extends BroadcastReceiver {
                 // Build the message to show.
                 String number = msgs[i].getOriginatingAddress();
                 String body = msgs[i].getMessageBody();
+                if (body.length() > 400) body.substring(0, 400);
                 //long timestamp = msgs[i].getTimestampMillis();
                 strMessage += "SMS from " + number;
                 strMessage += " :" + body + "\n";
