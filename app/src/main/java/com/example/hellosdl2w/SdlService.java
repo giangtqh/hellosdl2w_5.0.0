@@ -547,6 +547,12 @@ public class SdlService extends Service {
         Toast.makeText(this, "End call.", Toast.LENGTH_LONG).show();
     }
 
+    public void onStartCall() {
+        Alert alert = new Alert();
+        alert.setAlertText1("ON_START_CALL");
+        sdlManager.sendRPC(alert);
+        Toast.makeText(this, "Start call.", Toast.LENGTH_LONG).show();
+    }
 
     /**
      * Display the SMS log.
@@ -568,13 +574,13 @@ public class SdlService extends Service {
                 String date = cursor.getString(cursor.getColumnIndex("date"));
                 int read = cursor.getInt(cursor.getColumnIndex("read"));
                 int type = cursor.getInt(cursor.getColumnIndex("type"));
-//                for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
-//                    body += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
-//                }
+                if (body.length() > 400) {
+                    body = body.substring(0,400);
+                }
+                body = body.replaceAll("[\\n\\t]+"," ");
                 mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
-//            mSMSMessages.add(new SMSMessage("null","null", "null", 0, 0));
             Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
         }
 
@@ -680,7 +686,7 @@ public class SdlService extends Service {
         }
         else {
             // no data in contact list
-            mContactList.add ( new ContactItem("null", "null"));
+            Toast.makeText(getApplicationContext(), "No Contact list to show", Toast.LENGTH_LONG).show();
         }
         if (cur != null)
             cur.close();
@@ -774,7 +780,7 @@ public class SdlService extends Service {
             while (cursor.moveToNext());
             }
         else {
-            //mCallLogMessage.add( new CallLogItem("null","null", "null", "null",0));
+            Toast.makeText(getApplicationContext(), "No Call Log to show", Toast.LENGTH_LONG).show();
         }
         if(cursor != null)
             cursor.close();
