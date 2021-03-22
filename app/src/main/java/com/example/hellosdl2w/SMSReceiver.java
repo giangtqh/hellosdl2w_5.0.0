@@ -46,18 +46,19 @@ public class SMSReceiver extends BroadcastReceiver {
                 // Build the message to show.
                 String number = msgs[i].getOriginatingAddress();
                 String body = msgs[i].getMessageBody();
+                long timestamp = msgs[i].getTimestampMillis();
+                String date = Long.toString(timestamp);
                 if (body.length() > 400) body = body.substring(0, 400);
                 body = body.replaceAll("[\\n\\t]+"," ");
                 //long timestamp = msgs[i].getTimestampMillis();
-                strMessage += "SMS from " + number;
+                strMessage += "SMS from " + number + " date: " + date;
                 strMessage += " :" + body + "\n";
                 // Log and display the SMS message.
                 Log.d(TAG, "onReceive: " + strMessage);
-                Toast.makeText(context, strMessage, Toast.LENGTH_LONG).show();
-
+//                Toast.makeText(context, strMessage, Toast.LENGTH_LONG).show();
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onSMSNotification(new SMSMessage(number, body, "", 0, 1));
+                    instance.onSMSNotification(new SMSMessage(number, body, date, 0, 1));
                 }
             }
         }

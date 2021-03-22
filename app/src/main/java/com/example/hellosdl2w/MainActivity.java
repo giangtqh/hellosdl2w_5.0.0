@@ -3,6 +3,7 @@ package com.example.hellosdl2w;
 import android.Manifest;
 import android.app.PendingIntent;
 import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -115,7 +116,9 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "push SMS button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    instance.onSMSNotification(new SMSMessage("0967129109", "dummy sms message from mr.X", "", 0, 1));
+                    long time= System.currentTimeMillis();
+                    String date = Long.toString(time);
+                    instance.onSMSNotification(new SMSMessage("0967129109", "dummy sms message from mr.X", date, 0, 1));
                 }
             }
         });
@@ -172,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
                         int read = cursor.getInt(cursor.getColumnIndex("read"));
                         String address = cursor.getString(cursor.getColumnIndex("address"));
                         String date_sent = cursor.getString(cursor.getColumnIndex("date_sent"));
-//                        Log.d(TAG, address + " " + body + " " + read + " " + date_sent);
+                        Log.d(TAG, address + " " + body + " " + read + " " + date_sent);
                         String full_content = "";
                         for (int idx = 0; idx < cursor.getColumnCount(); idx++) {
                             full_content += " | " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
@@ -181,6 +184,47 @@ public class MainActivity extends AppCompatActivity {
                     } while (cursor.moveToNext());
                 } else {
                     Toast.makeText(getApplicationContext(), "No SMS", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+
+        final Button readSMS = (Button) findViewById(R.id.btnReadSms);
+        readSMS.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                EditText editText = (EditText) findViewById(R.id.editText_main);
+                // Set the destination phone number to the string in editText.
+                String number = editText.getText().toString();
+                if (number.matches("")) {
+                    Toast.makeText(getApplicationContext(), "Please enter phone number", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                // Find the sms_message view.
+                EditText smsEditText = (EditText) findViewById(R.id.sms_message);
+                // Get the text of the sms message.
+                String body = smsEditText.getText().toString();
+                if (body.matches("")) {
+                    Toast.makeText(getApplicationContext(), "Please enter message body", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Uri uri = Uri.parse("content://sms/inbox");
+                Cursor cursor = getApplicationContext().getContentResolver().query(uri, null, null, null, null);
+                try {
+                    while (cursor.moveToNext()) {
+                        if ((cursor.getString(cursor.getColumnIndex("address")).equals(number)) && (cursor.getInt(cursor.getColumnIndex("read")) == 0)) {
+                            if (cursor.getString(cursor.getColumnIndex("body")).startsWith(body)) {
+                                String SmsMessageId = cursor.getString(cursor.getColumnIndex("_id"));
+                                ContentValues values = new ContentValues();
+                                values.put("read", true);
+                                int result = getApplicationContext().getContentResolver().update(Uri.parse("content://sms/inbox"), values, "_id=" + SmsMessageId, null);
+                                Log.d("SMS", "update values of msgId: " + SmsMessageId + " return: " + result);
+                                Toast.makeText(getApplicationContext(), "Set read of message id " + SmsMessageId + (result == 0 ? " failed" : " succeed"),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e("Mark Read", "Error in Read: " + e.toString());
                 }
             }
         });

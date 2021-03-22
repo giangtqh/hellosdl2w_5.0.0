@@ -5,6 +5,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -84,7 +85,7 @@ public class SdlService extends Service {
 
     private static final String TAG = "SDL Service";
 
-    private static final String APP_NAME = "Amazing SDL2W App";
+    private static final String APP_NAME = "Amazing SDL2W";
     private static final String APP_NAME_ES = "Hola Sdl";
     private static final String APP_NAME_FR = "Bonjour Sdl";
     private static final String APP_ID = "8678309";
@@ -365,6 +366,8 @@ public class SdlService extends Service {
                                 CallActivity.makeCall(getApplicationContext(), phone_num);
                             } else if (cmdId < 3000) {
                                 // sms message commands
+                                SMSMessage sms = mMapSMSCmdId.get(cmdId);
+                                markMessageRead(getApplicationContext(), sms.address, sms.body);
                             } else {
                                 Toast.makeText(getApplicationContext(), "Invalid command Id: " + cmdId, Toast.LENGTH_LONG).show();
                             }
@@ -507,12 +510,23 @@ public class SdlService extends Service {
     // Alert message type:
     // ON_CALL, ON_END_CALL, ON_DIAL, ON_SMS
     public void onSMSNotification(SMSMessage message) {
-        Alert alertRequest = new Alert();
-        alertRequest.setAlertText1("ON_SMS");
-        alertRequest.setAlertText2(message.address);
-        alertRequest.setAlertText3(message.body);
-        sdlManager.sendRPC(alertRequest);
-        //Toast.makeText(this, "SdlService::onSMSNotification(): " + alert.message, Toast.LENGTH_LONG).show();
+        int cmdId = generateSMSCmdId();
+        AddCommand command = new AddCommand(cmdId);
+        command.setOnRPCResponseListener(new OnRPCResponseListener() {
+            @Override
+            public void onResponse(int correlationId, RPCResponse response) {
+                mMapSMSCmdId.put(cmdId, message); // put succeed command id only
+                Log.i(TAG, "AddCommand for new arrived sms message return : " + response.getSuccess());
+                Alert alertRequest = new Alert();
+                alertRequest.setAlertText1("ON_SMS");
+                sdlManager.sendRPC(alertRequest);
+            }
+        });
+        String json = mGson.toJson(message);
+        MenuParams params = new MenuParams();
+        params.setMenuName(json);
+        command.setMenuParams(params);
+        sdlManager.sendRPC(command);
     }
 
     public void onInCommingCall(String number, String name) {
@@ -886,5 +900,28 @@ public class SdlService extends Service {
             mSMSCommandId = 2000;
         }
         return mSMSCommandId;
+    }
+
+    private void markMessageRead(Context context, String number, String body) {
+        Uri uri = Uri.parse("content://sms/inbox");
+        Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
+        try {
+            while (cursor.moveToNext()) {
+                if ((cursor.getString(cursor.getColumnIndex("address")).equals(number)) && (cursor.getInt(cursor.getColumnIndex("read")) == 0)) {
+                    if (cursor.getString(cursor.getColumnIndex("body")).startsWith(body)) {
+                        String SmsMessageId = cursor.getString(cursor.getColumnIndex("_id"));
+                        ContentValues values = new ContentValues();
+                        values.put("read", true);
+                        int result = context.getContentResolver().update(Uri.parse("content://sms/inbox"), values, "_id=" + SmsMessageId, null);
+                        Log.d(TAG, "update values of msgId: " + SmsMessageId + " return: " + result);
+                        Toast.makeText(getApplicationContext(), "Set read of message id " + SmsMessageId + (result == 0 ? " failed" : " succeed"),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("Mark Read", "Error in Read: " + e.toString());
+        }
     }
 }
