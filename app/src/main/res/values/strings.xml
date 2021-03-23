@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Hello Sdl2W</string>
+    <string name="app_name">Amazing SDL2W</string>
     <string name="hello_world">Hello SDL!</string>
     <string name="action_settings">Settings</string>
+    <string name="select_transport">Select Transport</string>
 
     <string name="show">Show</string>
     <string name="enter_phone">Enter a phone number</string>
@@ -40,5 +41,9 @@
     <string name="welcome_textfield3">""</string>
     <string name="welcome_textfield4">""</string>
     <string name="welcome_speak">"Welcome to Hello SDL2W"</string>
+    <string-array name="transport_array">
+        <item>USB</item>
+        <item>TCP</item>
+    </string-array>
 
 </resources>
