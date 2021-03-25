@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
@@ -52,6 +53,8 @@ public class MainActivity extends AppCompatActivity {
     public ListView list;
     private static final int PERMISSION_ALL = 50;
     public static boolean isContactPermissionGranted = false;
+
+    private static boolean isServiceStarted = false;
 
     private String[] TRANSPORTS = {
             "USB",
@@ -113,10 +116,19 @@ public class MainActivity extends AppCompatActivity {
                 // Code here executes on main thread after user presses button
                 Log.d(TAG, "Address: " + eAddress.getText());
                 Log.d(TAG, "Port: " + ePort.getText());
-                proxyIntent.putExtra(SELECT_TRANSPORT, selectedTransportIndex);
-                proxyIntent.putExtra(ADDRESS, eAddress.getText().toString());
-                proxyIntent.putExtra(PORT, Integer.parseInt(ePort.getText().toString()));
-                startService(proxyIntent);
+                isServiceStarted = !isServiceStarted;
+                if (isServiceStarted) {
+                    proxyIntent.putExtra(SELECT_TRANSPORT, selectedTransportIndex);
+                    proxyIntent.putExtra(ADDRESS, eAddress.getText().toString());
+                    proxyIntent.putExtra(PORT, Integer.parseInt(ePort.getText().toString()));
+                    startService(proxyIntent);
+                    button.setBackgroundColor(Color.GREEN);
+                    button.setText("Disconnect");
+                } else {
+                    button.setText("Connect");
+                    button.setBackgroundColor(Color.GRAY);
+                    stopService(proxyIntent);
+                }
             }
         });
 
