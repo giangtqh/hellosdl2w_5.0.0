@@ -70,6 +70,7 @@ import com.smartdevicelink.proxy.rpc.listeners.OnRPCResponseListener;
 import com.smartdevicelink.transport.BaseTransportConfig;
 import com.smartdevicelink.transport.MultiplexTransportConfig;
 import com.smartdevicelink.transport.TCPTransportConfig;
+import com.smartdevicelink.transport.enums.TransportType;
 import com.smartdevicelink.util.DebugTool;
 
 import java.util.ArrayList;
@@ -290,32 +291,29 @@ public class SdlService extends Service {
                 DebugTool.enableDebugTool();
             }
             BaseTransportConfig transport = null;
-            if (BuildConfig.TRANSPORT.equals("MULTI")) {
-                int securityLevel;
-                if (BuildConfig.SECURITY.equals("HIGH")) {
-                    securityLevel = MultiplexTransportConfig.FLAG_MULTI_SECURITY_HIGH;
-                } else if (BuildConfig.SECURITY.equals("MED")) {
-                    securityLevel = MultiplexTransportConfig.FLAG_MULTI_SECURITY_MED;
-                } else if (BuildConfig.SECURITY.equals("LOW")) {
-                    securityLevel = MultiplexTransportConfig.FLAG_MULTI_SECURITY_LOW;
-                } else {
-                    securityLevel = MultiplexTransportConfig.FLAG_MULTI_SECURITY_OFF;
-                }
-                transport = new MultiplexTransportConfig(this, APP_ID, securityLevel);
-            } else if (BuildConfig.TRANSPORT.equals("TCP")) {
-                Bundle bundle = intent.getExtras();
-                if (bundle != null) {
+            Bundle bundle = intent.getExtras();
+            if (bundle != null) {
+                int selectedTransport = bundle.getInt(MainActivity.SELECT_TRANSPORT);
+                Log.e(TAG, "startProxy() selectedTransport is: " + selectedTransport);
+                if (selectedTransport == 0) {
+                    // USB
+                    List<TransportType> multiplexPrimaryTransports = Arrays.asList(TransportType.USB, TransportType.BLUETOOTH);
+                    List<TransportType> multiplexSecondaryTransports = Arrays.asList(TransportType.TCP, TransportType.USB, TransportType.BLUETOOTH);
+                    MultiplexTransportConfig mtc = new MultiplexTransportConfig(this, APP_ID, MultiplexTransportConfig.FLAG_MULTI_SECURITY_OFF);
+                    mtc.setPrimaryTransports(multiplexPrimaryTransports);
+                    mtc.setSecondaryTransports(multiplexSecondaryTransports);
+                    mtc.setRequiresHighBandwidth(true);
+                    transport = mtc;
+                } else if (selectedTransport == 1) {
+                    // TCP
                     String addr = bundle.getString(MainActivity.ADDRESS);
                     int port = bundle.getInt(MainActivity.PORT);
-                    Log.v(TAG, "SHIT Address: " + addr + ":" + port);
+                    Log.v(TAG, "TCP Address: " + addr + ":" + port);
                     transport = new TCPTransportConfig(port, addr, true);
-                } else {
-                    transport = new TCPTransportConfig(TCP_PORT, DEV_MACHINE_IP_ADDRESS, true);
+                    Toast.makeText(getApplicationContext(), "TCP connected " + addr + ":" + port, Toast.LENGTH_LONG).show();
                 }
-            } else if (BuildConfig.TRANSPORT.equals("MULTI_HB")) {
-                MultiplexTransportConfig mtc = new MultiplexTransportConfig(this, APP_ID, MultiplexTransportConfig.FLAG_MULTI_SECURITY_OFF);
-                mtc.setRequiresHighBandwidth(true);
-                transport = mtc;
+            } else {
+                Log.e(TAG, "bundle is NULL");
             }
 
             // The app type to be used
@@ -342,7 +340,7 @@ public class SdlService extends Service {
                                 //performWelcomeSpeak();
                                 //performWelcomeShow();
                                 //preloadChoices();
-                                //subscribeToButtons();
+//                                subscribeToButtons();
                                 showFeatures();
                                 //sendContactlist();
                                 //startAudioStream();
@@ -387,16 +385,16 @@ public class SdlService extends Service {
                             OnButtonPress buttonPress = (OnButtonPress) notification;
                             int btnId = buttonPress.getCustomButtonID();
                             switch (btnId) {
-                                    case DENY_BTN_ID:
-                                            Toast.makeText(getApplicationContext(), "Oh shit, Deny button clicked", Toast.LENGTH_LONG).show();
-                                            OngoingCall.hangup();
-                                            break;
-                                    case ACCEPT_BTN_ID:
-                                            Toast.makeText(getApplicationContext(), "Oh man, Accept button has clicked", Toast.LENGTH_LONG).show();
-                                            OngoingCall.answer();
-                                            break;
-                                }
+                                case DENY_BTN_ID:
+                                    Toast.makeText(getApplicationContext(), "Oh shit, Deny button clicked", Toast.LENGTH_LONG).show();
+                                    OngoingCall.hangup();
+                                    break;
+                                case ACCEPT_BTN_ID:
+                                    Toast.makeText(getApplicationContext(), "Oh man, Accept button has clicked", Toast.LENGTH_LONG).show();
+                                    OngoingCall.answer();
+                                    break;
                             }
+                        }
                     });
 
                 }
@@ -519,6 +517,7 @@ public class SdlService extends Service {
                 Log.i(TAG, "AddCommand for new arrived sms message return : " + response.getSuccess());
                 Alert alertRequest = new Alert();
                 alertRequest.setAlertText1("ON_SMS");
+                alertRequest.setAlertText2(String.valueOf(cmdId));
                 sdlManager.sendRPC(alertRequest);
             }
         });
@@ -582,16 +581,16 @@ public class SdlService extends Service {
                 String body = cursor.getString(cursor.getColumnIndex("body"));
                 String address = cursor.getString(cursor.getColumnIndex("address"));
                 String name = getNameByPhoneNumber(address);
-                if(!name.equals("")){
+                if (!name.equals("")) {
                     address = name;
                 }
                 String date = cursor.getString(cursor.getColumnIndex("date"));
                 int read = cursor.getInt(cursor.getColumnIndex("read"));
                 int type = cursor.getInt(cursor.getColumnIndex("type"));
                 if (body.length() > 400) {
-                    body = body.substring(0,400);
+                    body = body.substring(0, 400);
                 }
-                body = body.replaceAll("[\\n\\t]+"," ");
+                body = body.replaceAll("[\\n\\t]+", " ");
                 mSMSMessages.add(new SMSMessage(address, body, date, read, type));
             } while (cursor.moveToNext());
         } else {
@@ -659,8 +658,7 @@ public class SdlService extends Service {
             if (mSMSMessages.size() > 0) {
                 mSMSIterator = mSMSMessages.iterator();
                 addSMSCommands();
-            }
-            else {
+            } else {
                 Alert alert = new Alert();
                 alert.setAlertText1("SMS_FILLED");
                 sdlManager.sendRPC(alert);
@@ -674,7 +672,7 @@ public class SdlService extends Service {
     private void createContactList() {
         mContactList = new ArrayList<ContactItem>();
         ContentResolver cr = getContentResolver();
-        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null,  null);
+        Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
 
         if ((cur != null ? cur.getCount() : 0) > 0) {
             while (cur.moveToNext()) {
@@ -695,10 +693,9 @@ public class SdlService extends Service {
                     }
                     pCur.close();
                 }
-                mContactList.add ( new ContactItem(name, phoneNo));
+                mContactList.add(new ContactItem(name, phoneNo));
             }
-        }
-        else {
+        } else {
             // no data in contact list
             Toast.makeText(getApplicationContext(), "No Contact list to show", Toast.LENGTH_LONG).show();
         }
@@ -714,8 +711,7 @@ public class SdlService extends Service {
             if ((mContactList != null) && (mContactList.size() > 0)) {
                 mContactIterator = mContactList.iterator();
                 addContactCommands();
-            }
-            else {
+            } else {
                 Alert alert = new Alert();
                 alert.setAlertText1("CONTACT_FILLED");
                 sdlManager.sendRPC(alert);
@@ -740,7 +736,7 @@ public class SdlService extends Service {
             params.setMenuName(json);
             command.setMenuParams(params);
             sdlManager.sendRPC(command);
-        } else if (mContactList != null){
+        } else if (mContactList != null) {
             mCmdPosIncIndex = 0;
             // reset iterator
             mContactIterator = mContactList.iterator();
@@ -775,10 +771,10 @@ public class SdlService extends Service {
     private void createCallLogList() {
         mCallLogMessage = new ArrayList<CallLogItem>();
         Uri uri = Uri.parse("content://call_log/calls");
-        Cursor cursor = getContentResolver().query(uri, null ,null,null);
+        Cursor cursor = getContentResolver().query(uri, null, null, null);
 
         assert cursor != null;
-        if(cursor.moveToFirst()){
+        if (cursor.moveToFirst()) {
             do {
                 String number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
                 String name = getNameByPhoneNumber(number);
@@ -789,14 +785,13 @@ public class SdlService extends Service {
                 int type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
                 if (type > 3)
                     type = 3;
-                mCallLogMessage.add( new CallLogItem(name, number, date, duration, type));
-                }
-            while (cursor.moveToNext());
+                mCallLogMessage.add(new CallLogItem(name, number, date, duration, type));
             }
-        else {
+            while (cursor.moveToNext());
+        } else {
             Toast.makeText(getApplicationContext(), "No Call Log to show", Toast.LENGTH_LONG).show();
         }
-        if(cursor != null)
+        if (cursor != null)
             cursor.close();
     }
 
@@ -819,7 +814,7 @@ public class SdlService extends Service {
     }
 
 
-    private void addCallLogCommands(){
+    private void addCallLogCommands() {
         if (mCallLogIterator.hasNext()) {
             final CallLogItem item = mCallLogIterator.next();
             final int cmdId = generatePhoneCmdId();
@@ -827,7 +822,7 @@ public class SdlService extends Service {
             command.setOnRPCResponseListener(new OnRPCResponseListener() {
                 @Override
                 public void onResponse(int correlationId, RPCResponse response) {
-                    mMapCallLogCmdId.put(cmdId,item);
+                    mMapCallLogCmdId.put(cmdId, item);
                     addCallLogCommands();
                 }
             });
@@ -855,8 +850,7 @@ public class SdlService extends Service {
             if ((mCallLogMessage != null) && (mCallLogMessage.size() > 0)) {
                 mCallLogIterator = mCallLogMessage.iterator();
                 addCallLogCommands();
-            }
-            else {
+            } else {
                 Alert alert = new Alert();
                 alert.setAlertText1("CALL_LOG_FILLED");
                 sdlManager.sendRPC(alert);
@@ -865,12 +859,12 @@ public class SdlService extends Service {
     }
 
     public String getNameByPhoneNumber(String phoneNumber) {
-        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI,Uri.encode(phoneNumber));
+        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
         String[] projection = new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME};
         String contactName = "";
-        Cursor cursor = getContentResolver().query(uri,projection,null,null,null);
+        Cursor cursor = getContentResolver().query(uri, projection, null, null, null);
         if (cursor != null) {
-            if(cursor.moveToFirst()) {
+            if (cursor.moveToFirst()) {
                 contactName = cursor.getString(0);
             }
             cursor.close();

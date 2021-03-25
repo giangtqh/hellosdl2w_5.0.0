@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
@@ -17,29 +18,32 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.Toast;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import kotlin.collections.ArraysKt;
-import static android.Manifest.permission.CALL_PHONE;
+
 import static android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER;
 import static android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME;
-import static androidx.core.content.PermissionChecker.PERMISSION_GRANTED;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     public static final String PORT = "com.example.PORT";
     public static final String ADDRESS = "com.example.ADDRESS";
+    public static final String SELECT_TRANSPORT = "com.example.SELECTED_TRANSPORT";
 
     private static final int MY_PERMISSIONS_REQUEST_SEND_SMS = 1;
     private static final int MY_PERMISSIONS_REQUEST_RECEIVE_SMS = 2;
@@ -49,6 +53,15 @@ public class MainActivity extends AppCompatActivity {
     public ListView list;
     private static final int PERMISSION_ALL = 50;
     public static boolean isContactPermissionGranted = false;
+
+    private static boolean isServiceStarted = false;
+
+    private String[] TRANSPORTS = {
+            "USB",
+            "TCP"
+    };
+    // Default transport is USB
+    private int selectedTransportIndex = 0;
 
     String[] PERMISSIONS = {
             android.Manifest.permission.READ_CONTACTS,
@@ -68,30 +81,59 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //If we are connected to a module we want to start our SdlService
-        if (BuildConfig.TRANSPORT.equals("MULTI") || BuildConfig.TRANSPORT.equals("MULTI_HB")) {
-            SdlReceiver.queryForConnectedService(this);
-        } else if (BuildConfig.TRANSPORT.equals("TCP")) {
-            final EditText eAddress = (EditText) findViewById(R.id.editIP);
-            final EditText ePort = (EditText) findViewById(R.id.editPort);
+        // Get reference of widgets from XML layout
+        final Spinner spinner = (Spinner) findViewById(R.id.spinner);
 
-            final Intent proxyIntent = new Intent((Context) this, SdlService.class);
-            final Button button = (Button) findViewById(R.id.btConnect);
-            button.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    // Code here executes on main thread after user presses button
-                    Log.d(TAG, "Address: " + eAddress.getText());
-                    Log.d(TAG, "Port: " + ePort.getText());
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                this, R.layout.spinner_item, TRANSPORTS );
+        // Create an ArrayAdapter using the string array and a default spinner layout
+//        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+//                R.array.transport_array, R.layout.spinner_item);
+        // Specify the layout to use when the list of choices appears
+        adapter.setDropDownViewResource(R.layout.spinner_item);
+        // Apply the adapter to the spinner
+        spinner.setAdapter(adapter);
+
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                Log.e(TAG, "selected transport: " + TRANSPORTS[position] + " pos: " + position);
+                selectedTransportIndex = position;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+        final Intent proxyIntent = new Intent((Context) this, SdlService.class);
+        proxyIntent.putExtra(SELECT_TRANSPORT, selectedTransportIndex);
+        final EditText eAddress = (EditText) findViewById(R.id.editIP);
+        final EditText ePort = (EditText) findViewById(R.id.editPort);
+        final Button button = (Button) findViewById(R.id.btConnect);
+        button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                // Code here executes on main thread after user presses button
+                Log.d(TAG, "Address: " + eAddress.getText());
+                Log.d(TAG, "Port: " + ePort.getText());
+                isServiceStarted = !isServiceStarted;
+                if (isServiceStarted) {
+                    proxyIntent.putExtra(SELECT_TRANSPORT, selectedTransportIndex);
                     proxyIntent.putExtra(ADDRESS, eAddress.getText().toString());
                     proxyIntent.putExtra(PORT, Integer.parseInt(ePort.getText().toString()));
                     startService(proxyIntent);
+                    button.setBackgroundColor(Color.GREEN);
+                    button.setText("Disconnect");
+                } else {
+                    button.setText("Connect");
+                    button.setBackgroundColor(Color.GRAY);
+                    stopService(proxyIntent);
                 }
-            });
-//            startService(proxyIntent);
-        }
+            }
+        });
 
-        // The request code used in ActivityCompat.requestPermissions()
-        // and returned in the Activity's onRequestPermissionsResult()
+    // The request code used in ActivityCompat.requestPermissions()
+    // and returned in the Activity's onRequestPermissionsResult()
 
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
@@ -101,7 +143,7 @@ public class MainActivity extends AppCompatActivity {
 
         checkForSmsPermission(MY_PERMISSIONS_REQUEST_RECEIVE_SMS);
         enableSmsButton();
-        final ImageButton btnSendSms = (ImageButton) findViewById(R.id.message_icon);
+        final ImageButton btnSendSms = (ImageButton) findViewById(R.id.iconSendSMS);
         btnSendSms.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 // Code here executes on main thread after user presses button
@@ -116,7 +158,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "push SMS button clicked");
                 SdlService instance = SdlService.getInstance();
                 if (instance != null) {
-                    long time= System.currentTimeMillis();
+                    long time = System.currentTimeMillis();
                     String date = Long.toString(time);
                     instance.onSMSNotification(new SMSMessage("0967129109", "dummy sms message from mr.X", date, 0, 1));
                 }
@@ -191,7 +233,7 @@ public class MainActivity extends AppCompatActivity {
         final Button readSMS = (Button) findViewById(R.id.btnReadSms);
         readSMS.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                EditText editText = (EditText) findViewById(R.id.editText_main);
+                EditText editText = (EditText) findViewById(R.id.editPhoneNumber);
                 // Set the destination phone number to the string in editText.
                 String number = editText.getText().toString();
                 if (number.matches("")) {
@@ -199,7 +241,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 // Find the sms_message view.
-                EditText smsEditText = (EditText) findViewById(R.id.sms_message);
+                EditText smsEditText = (EditText) findViewById(R.id.editSmsBody);
                 // Get the text of the sms message.
                 String body = smsEditText.getText().toString();
                 if (body.matches("")) {
@@ -239,7 +281,7 @@ public class MainActivity extends AppCompatActivity {
                 ArrayAdapter adapter = new ArrayAdapter<String>(MainActivity.this,
                         android.R.layout.simple_list_item_1, android.R.id.text1, listcontact);
                 list.setAdapter(adapter);
-                }
+            }
         });
     }
 
@@ -256,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
                         ContactsContract.Contacts.DISPLAY_NAME));
                 nameList.add(name);
                 System.out.println("add name finished" + name + " + " + id);
-                if (cur.getInt(cur.getColumnIndex( ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
+                if (cur.getInt(cur.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0) {
 
                     Cursor pCur = cr.query(
                             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -331,6 +373,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return true;
     }
+
     /**
      * Checks whether the app has Contact permission.
      */
@@ -358,12 +401,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
-        Log.d(TAG, "requestCode: "+requestCode);
+        Log.d(TAG, "requestCode: " + requestCode);
         switch (requestCode) {
             case PERMISSION_ALL: {
                 if (grantResults.length > 0) {
-                    for (int i = 0; i < PERMISSIONS.length; i ++) {
-                        Log.d(TAG, " Granted result for "+ PERMISSIONS[i] + " is: " + grantResults[i] );
+                    for (int i = 0; i < PERMISSIONS.length; i++) {
+                        Log.d(TAG, " Granted result for " + PERMISSIONS[i] + " is: " + grantResults[i]);
                     }
                 }
             }
@@ -429,7 +472,7 @@ public class MainActivity extends AppCompatActivity {
      * @param view View (message_icon) that was clicked.
      */
     public void smsSendMessage(View view) {
-        EditText editText = (EditText) findViewById(R.id.editText_main);
+        EditText editText = (EditText) findViewById(R.id.editPhoneNumber);
         // Set the destination phone number to the string in editText.
         String destinationAddress = editText.getText().toString();
         if (destinationAddress.matches("")) {
@@ -437,7 +480,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // Find the sms_message view.
-        EditText smsEditText = (EditText) findViewById(R.id.sms_message);
+        EditText smsEditText = (EditText) findViewById(R.id.editSmsBody);
         // Get the text of the sms message.
         String smsMessage = smsEditText.getText().toString();
         if (smsMessage.matches("")) {
@@ -458,33 +501,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Makes the sms button (message icon) invisible so that it can't be used,
-     * and makes the Retry button visible.
+     * Makes the sms button (message icon) invisible so that it can't be used
      */
     private void disableSmsButton() {
         Toast.makeText((Context) this, R.string.sms_disabled, Toast.LENGTH_LONG).show();
-        ImageButton smsButton = (ImageButton) findViewById(R.id.message_icon);
+        ImageButton smsButton = (ImageButton) findViewById(R.id.iconSendSMS);
         smsButton.setVisibility(View.INVISIBLE);
-        Button retryButton = (Button) findViewById(R.id.button_retry);
-        retryButton.setVisibility(View.VISIBLE);
     }
 
     /**
      * Makes the sms button (message icon) visible so that it can be used.
      */
     private void enableSmsButton() {
-        ImageButton smsButton = (ImageButton) findViewById(R.id.message_icon);
+        ImageButton smsButton = (ImageButton) findViewById(R.id.iconSendSMS);
         smsButton.setVisibility(View.VISIBLE);
-    }
-
-    /**
-     * Sends an intent to start the activity.
-     *
-     * @param view View (Retry button) that was clicked.
-     */
-    public void retryApp(View view) {
-        Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
-        startActivity(intent);
     }
 
     @Override
@@ -519,11 +549,12 @@ public class MainActivity extends AppCompatActivity {
 //            }
 //        });
     }
+
     private void offerReplacingDefaultDialer() {
         TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
         if (!getPackageName().equals(telecomManager.getDefaultDialerPackage())) {
             Intent intent = new Intent(ACTION_CHANGE_DEFAULT_DIALER)
-                            .putExtra(EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
+                    .putExtra(EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
             startActivity(intent);
         }
     }
