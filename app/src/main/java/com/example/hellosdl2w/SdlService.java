@@ -531,8 +531,10 @@ public class SdlService extends Service {
     public void onInCommingCall(String number, String name) {
         if (name.equals("Unknown")) {
             int cmdId = generatePhoneCmdId();
+            long time = System.currentTimeMillis();
+            String date = Long.toString(time);
             /* create new CallLogMessage to send AddCommand*/
-            CallLogItem callLog = new CallLogItem(name, number, "", "", 1);
+            CallLogItem callLog = new CallLogItem(name, number, date, "", 1);
             AddCommand command = new AddCommand(cmdId);
             command.setOnRPCResponseListener(new OnRPCResponseListener() {
                 @Override
