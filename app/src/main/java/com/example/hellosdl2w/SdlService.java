@@ -529,6 +529,26 @@ public class SdlService extends Service {
     }
 
     public void onInCommingCall(String number, String name) {
+        if (name.equals("Unknown")) {
+            int cmdId = generatePhoneCmdId();
+            long time = System.currentTimeMillis();
+            String date = Long.toString(time);
+            /* create new CallLogMessage to send AddCommand*/
+            CallLogItem callLog = new CallLogItem(name, number, date, "", 1);
+            AddCommand command = new AddCommand(cmdId);
+            command.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override
+                public void onResponse(int correlationId, RPCResponse response) {
+                    mMapCallLogCmdId.put(cmdId, callLog); // put succeed command id only
+                    Log.i(TAG, "AddCommand for unknow phone number IncommingCall : " + response.getSuccess());
+                }
+            });
+            String json = mGson.toJson(callLog);
+            MenuParams params = new MenuParams();
+            params.setMenuName(json);
+            command.setMenuParams(params);
+            sdlManager.sendRPC(command);
+        }
         Alert alert = new Alert();
         alert.setAlertText1("ON_CALL");
         alert.setAlertText2(number);
